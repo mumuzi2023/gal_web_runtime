@@ -30,7 +30,7 @@ jobs:
       - run: npm run build
 
       - name: Copy game data to dist
-        run: cp public/game_data.json dist/
+        run: cp public/*.json dist/
 
       - uses: actions/upload-pages-artifact@v3
         with:

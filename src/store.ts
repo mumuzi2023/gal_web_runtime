@@ -9,6 +9,7 @@ import type {
   ChoiceOption,
 } from "./types";
 import { evaluateCondition, applySet } from "./engine";
+import { preloadImages, collectImageUrls } from "./preloader";
 
 const SAVE_KEY = "galgame_saves";
 const SETTINGS_KEY = "galgame_settings";
@@ -476,6 +477,9 @@ export const useGameStore = create<GameState>((set, get) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data: GameData = await res.json();
         set({ gameData: data, loading: false });
+        // Preload all images in background
+        const imageUrls = collectImageUrls(data);
+        preloadImages(imageUrls);
       } catch (e: unknown) {
         set({ error: String(e), loading: false });
       }

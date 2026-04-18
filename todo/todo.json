@@ -1,0 +1,79 @@
+{
+  "meta": {
+    "project": "gal_web_runtime",
+    "updated_at": "2026-04-18T13:00:00Z",
+    "owner": "copilot"
+  },
+  "items": [
+    {
+      "id": "T001",
+      "title": "图片预加载与缓存",
+      "status": "done",
+      "priority": "P0",
+      "depends_on": [],
+      "acceptance": "加载游戏数据后自动预加载所有背景和角色图片，切换场景零延迟",
+      "notes": "新增 preloader.ts，在 loadGameData 后台预加载所有图片 URL",
+      "last_updated": "2026-04-18T13:00:00Z"
+    },
+    {
+      "id": "T002",
+      "title": "全中文标识",
+      "status": "done",
+      "priority": "P0",
+      "depends_on": [],
+      "acceptance": "所有 UI 按钮、提示全部使用中文",
+      "notes": "AUTO→自动, LOG→记录, SAVE→存档, MENU→菜单, Slot→存档位, locale→zh-CN, 新增进度按钮",
+      "last_updated": "2026-04-18T13:00:00Z"
+    },
+    {
+      "id": "T003",
+      "title": "亮色调浮窗面板",
+      "status": "done",
+      "priority": "P0",
+      "depends_on": [],
+      "acceptance": "设置/存档/结局面板改为亮色调，背景显示当前场景图",
+      "notes": "全部面板改为白底半透明，场景背景图衬底，柔和边框阴影",
+      "last_updated": "2026-04-18T13:00:00Z"
+    },
+    {
+      "id": "T004",
+      "title": "对话记录角色头像",
+      "status": "done",
+      "priority": "P0",
+      "depends_on": [],
+      "acceptance": "LOG中显示角色头像，不同角色/旁白间用淡横线分隔",
+      "notes": "BacklogPanel 新增头像圆形缩略图 + 渐变横线分隔符",
+      "last_updated": "2026-04-18T13:00:00Z"
+    },
+    {
+      "id": "T005",
+      "title": "存档缩略图",
+      "status": "done",
+      "priority": "P1",
+      "depends_on": ["T001"],
+      "acceptance": "存档槽显示保存时的场景缩略图",
+      "notes": "SaveLoadScreen 显示 slot.background + 角色立绘小窗口渲染",
+      "last_updated": "2026-04-18T13:00:00Z"
+    },
+    {
+      "id": "T006",
+      "title": "进度流程图",
+      "status": "done",
+      "priority": "P1",
+      "depends_on": [],
+      "acceptance": "新增可拖拽流程图面板，显示章节分支节点，点击跳转，解锁逻辑正确",
+      "notes": "新增 ProgressPanel.tsx，SVG 绘制节点+边，支持拖拽、点击跳转、解锁逻辑",
+      "last_updated": "2026-04-18T13:00:00Z"
+    },
+    {
+      "id": "T007",
+      "title": "全中文演示数据",
+      "status": "done",
+      "priority": "P1",
+      "depends_on": ["T001", "T002", "T003", "T004", "T005", "T006"],
+      "acceptance": "创建全中文 demo game_data.json 展示所有新功能",
+      "notes": "demo_game_data.json - 星海学园：命运的抉择，4个角色，7个场景，5个结局",
+      "last_updated": "2026-04-18T13:00:00Z"
+    }
+  ]
+}

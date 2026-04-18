@@ -10,6 +10,7 @@ import SettingsPanel from "./components/SettingsPanel";
 import SaveLoadScreen from "./components/SaveLoadScreen";
 import BacklogPanel from "./components/BacklogPanel";
 import EndingsScreen from "./components/EndingsScreen";
+import ProgressPanel from "./components/ProgressPanel";
 
 export default function App() {
   const loadGameData = useGameStore((s) => s.loadGameData);
@@ -67,6 +68,7 @@ export default function App() {
       <SaveLoadScreen />
       <BacklogPanel />
       <EndingsScreen />
+      <ProgressPanel />
     </div>
   );
 }

@@ -125,7 +125,7 @@ export default function DialogBox() {
                 autoMode ? "bg-blue-500/80 text-white" : "bg-black/60 text-white/60"
               } hover:bg-white/20 transition`}
             >
-              AUTO
+              自动
             </button>
             <button
               onClick={(e) => {
@@ -134,7 +134,7 @@ export default function DialogBox() {
               }}
               className="px-2 py-0.5 text-xs rounded bg-black/60 text-white/60 hover:bg-white/20 transition"
             >
-              LOG
+              记录
             </button>
             <button
               onClick={(e) => {
@@ -143,7 +143,16 @@ export default function DialogBox() {
               }}
               className="px-2 py-0.5 text-xs rounded bg-black/60 text-white/60 hover:bg-white/20 transition"
             >
-              SAVE
+              存档
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setScreen("progress");
+              }}
+              className="px-2 py-0.5 text-xs rounded bg-black/60 text-white/60 hover:bg-white/20 transition"
+            >
+              进度
             </button>
             <button
               onClick={(e) => {
@@ -152,7 +161,7 @@ export default function DialogBox() {
               }}
               className="px-2 py-0.5 text-xs rounded bg-black/60 text-white/60 hover:bg-white/20 transition"
             >
-              MENU
+              菜单
             </button>
           </div>
         </div>

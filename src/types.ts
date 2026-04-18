@@ -221,4 +221,4 @@ export interface SaveSlot {
   description: string;
 }
 
-export type Screen = "title" | "game" | "save" | "load" | "settings" | "backlog" | "endings";
+export type Screen = "title" | "game" | "save" | "load" | "settings" | "backlog" | "endings" | "progress";

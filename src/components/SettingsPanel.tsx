@@ -5,13 +5,20 @@ export default function SettingsPanel() {
   const setScreen = useGameStore((s) => s.setScreen);
   const settings = useGameStore((s) => s.settings);
   const updateSettings = useGameStore((s) => s.updateSettings);
+  const background = useGameStore((s) => s.background);
 
   if (screen !== "settings") return null;
 
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-      <div className="bg-gray-900/95 border border-white/10 rounded-lg w-full max-w-md p-6">
-        <h2 className="text-xl font-bold text-white mb-6 text-center">设置</h2>
+    <div className="absolute inset-0 z-50 flex items-center justify-center">
+      {/* Background image */}
+      {background && (
+        <img src={background} alt="" className="absolute inset-0 w-full h-full object-cover" />
+      )}
+      <div className="absolute inset-0 bg-white/40 backdrop-blur-md" />
+
+      <div className="relative bg-white/90 border border-gray-200 rounded-xl w-full max-w-md p-6 shadow-xl">
+        <h2 className="text-xl font-bold text-gray-800 mb-6 text-center">设置</h2>
 
         <div className="space-y-5">
           <SliderSetting
@@ -78,13 +85,13 @@ export default function SettingsPanel() {
         <div className="mt-8 flex justify-center gap-4">
           <button
             onClick={() => setScreen("title")}
-            className="px-6 py-2 bg-red-500/20 text-red-300 rounded hover:bg-red-500/40 transition"
+            className="px-6 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition font-medium"
           >
             返回标题
           </button>
           <button
             onClick={() => setScreen("game")}
-            className="px-6 py-2 bg-white/10 text-white/80 rounded hover:bg-white/20 transition"
+            className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition font-medium"
           >
             返回游戏
           </button>
@@ -114,8 +121,8 @@ function SliderSetting({
   return (
     <div>
       <div className="flex justify-between text-sm mb-1">
-        <span className="text-white/70">{label}</span>
-        <span className="text-white/50">{displayValue}</span>
+        <span className="text-gray-700">{label}</span>
+        <span className="text-gray-500">{displayValue}</span>
       </div>
       <input
         type="range"
@@ -124,7 +131,7 @@ function SliderSetting({
         step={step}
         value={value}
         onChange={(e) => onChange(parseFloat(e.target.value))}
-        className="w-full accent-blue-400 h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer"
+        className="w-full accent-blue-500 h-1.5 bg-gray-200 rounded-full appearance-none cursor-pointer"
       />
     </div>
   );

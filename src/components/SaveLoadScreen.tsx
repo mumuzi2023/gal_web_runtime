@@ -6,6 +6,8 @@ export default function SaveLoadScreen() {
   const saves = useGameStore((s) => s.saves);
   const saveGame = useGameStore((s) => s.saveGame);
   const loadGame = useGameStore((s) => s.loadGame);
+  const background = useGameStore((s) => s.background);
+  const gameData = useGameStore((s) => s.gameData);
 
   if (screen !== "save" && screen !== "load") return null;
 
@@ -21,62 +23,131 @@ export default function SaveLoadScreen() {
     }
   };
 
-  return (
-    <div className="absolute inset-0 z-50 flex flex-col items-center bg-black/80 backdrop-blur-sm">
-      <div className="w-full max-w-2xl px-6 py-8">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold text-white">
-            {isSave ? "存档" : "读档"}
-          </h2>
-          <button
-            onClick={() => setScreen("game")}
-            className="text-white/60 hover:text-white transition text-sm"
-          >
-            ✕ 关闭
-          </button>
-        </div>
+  const resolveExpression = (charKey: string, expr: string): string => {
+    if (!gameData) return "";
+    const charDef = gameData.characters[charKey];
+    if (!charDef) return "";
+    const manifest = gameData._asset_manifest;
+    const raw =
+      charDef.expressions[expr] ||
+      charDef.expressions["normal"] ||
+      Object.values(charDef.expressions)[0] ||
+      "";
+    if (!raw) return "";
+    if (raw.startsWith("http")) return raw;
+    return manifest?.[raw] || raw;
+  };
 
-        <div className="grid grid-cols-2 gap-3 max-h-[70vh] overflow-y-auto backlog-scroll">
-          {saves.map((slot, i) => (
+  return (
+    <div className="absolute inset-0 z-50 flex flex-col items-center">
+      {/* Background image */}
+      {background && (
+        <img src={background} alt="" className="absolute inset-0 w-full h-full object-cover" />
+      )}
+      <div className="absolute inset-0 bg-white/40 backdrop-blur-md" />
+
+      <div className="relative w-full max-w-3xl px-6 py-8">
+        <div className="bg-white/90 rounded-xl border border-gray-200 shadow-xl p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-bold text-gray-800">
+              {isSave ? "存档" : "读档"}
+            </h2>
             <button
-              key={i}
-              onClick={() => handleSlotClick(i)}
-              className={`text-left p-3 rounded border transition ${
-                slot
-                  ? "border-white/20 bg-white/5 hover:bg-white/10"
-                  : "border-white/10 bg-white/2 hover:bg-white/5"
-              } ${!slot && !isSave ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
-              disabled={!slot && !isSave}
+              onClick={() => setScreen("game")}
+              className="text-gray-500 hover:text-gray-800 transition text-sm"
             >
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-white/80 text-sm font-medium">
-                  Slot {i + 1}
-                </span>
-                {slot && (
-                  <span className="text-white/40 text-xs">
-                    {new Date(slot.timestamp).toLocaleString("ja-JP", {
-                      month: "2-digit",
-                      day: "2-digit",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </span>
-                )}
-              </div>
-              {slot ? (
-                <div>
-                  <div className="text-white/60 text-xs truncate">
-                    {slot.sceneKey}
-                  </div>
-                  <div className="text-white/40 text-xs truncate mt-0.5">
-                    {slot.description}
-                  </div>
-                </div>
-              ) : (
-                <div className="text-white/30 text-xs">— 空 —</div>
-              )}
+              ✕ 关闭
             </button>
-          ))}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 max-h-[70vh] overflow-y-auto backlog-scroll">
+            {saves.map((slot, i) => (
+              <button
+                key={i}
+                onClick={() => handleSlotClick(i)}
+                className={`text-left rounded-lg border transition overflow-hidden ${
+                  slot
+                    ? "border-gray-300 bg-white hover:bg-gray-50 hover:shadow-md"
+                    : "border-gray-200 bg-gray-50 hover:bg-gray-100"
+                } ${!slot && !isSave ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
+                disabled={!slot && !isSave}
+              >
+                {/* Thumbnail area */}
+                <div className="relative w-full h-24 bg-gray-100 overflow-hidden">
+                  {slot?.background ? (
+                    <>
+                      <img
+                        src={slot.background}
+                        alt=""
+                        className="w-full h-full object-cover"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                      />
+                      {/* Mini character sprites */}
+                      <div className="absolute inset-0">
+                        {slot.characters.map((vc) => {
+                          const spriteUrl = resolveExpression(vc.key, vc.expression);
+                          if (!spriteUrl) return null;
+                          const posStyle: React.CSSProperties = {
+                            position: "absolute",
+                            bottom: 0,
+                            height: "90%",
+                          };
+                          if (vc.position === "left") posStyle.left = "10%";
+                          else if (vc.position === "right") posStyle.right = "10%";
+                          else { posStyle.left = "50%"; posStyle.transform = "translateX(-50%)"; }
+                          return (
+                            <img
+                              key={vc.key}
+                              src={spriteUrl}
+                              alt=""
+                              style={posStyle}
+                              className="object-contain"
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                            />
+                          );
+                        })}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-300 text-2xl">
+                      {slot ? "📷" : ""}
+                    </div>
+                  )}
+                </div>
+
+                {/* Info area */}
+                <div className="p-3">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-gray-700 text-sm font-medium">
+                      存档位 {i + 1}
+                    </span>
+                    {slot && (
+                      <span className="text-gray-400 text-xs">
+                        {new Date(slot.timestamp).toLocaleString("zh-CN", {
+                          month: "2-digit",
+                          day: "2-digit",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    )}
+                  </div>
+                  {slot ? (
+                    <div>
+                      <div className="text-gray-600 text-xs truncate">
+                        {slot.sceneKey}
+                      </div>
+                      <div className="text-gray-400 text-xs truncate mt-0.5">
+                        {slot.description}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-gray-300 text-xs">— 空 —</div>
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>
