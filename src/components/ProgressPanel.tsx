@@ -1,152 +1,204 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from "react";
 import { useGameStore } from "../store";
-import type { GameData, Command, ChoiceCommand } from "../types";
+import type { GameData, ChoiceCommand } from "../types";
 
-interface FlowNode {
+/* ─── Layout constants ─── */
+const CH_W = 160;
+const CH_H = 48;
+const C_W = 80;
+const C_H = 30;
+const ROW_H = 140;
+const COL_W = 220;
+const CX = 350;
+const PAD_T = 50;
+const BRACE_GAP = 22;
+const CORNER_R = 10;
+
+/* ─── Types ─── */
+interface FNode {
   id: string;
   label: string;
   type: "chapter" | "choice";
-  x: number;
+  cx: number;
   y: number;
-  unlocked: boolean;
 }
 
-interface FlowEdge {
+interface FEdge {
   from: string;
   to: string;
   label?: string;
 }
 
+/* ─── Graph builder ─── */
 function buildFlowGraph(
   gameData: GameData,
-  unlockedScenes: Set<string>
-): { nodes: FlowNode[]; edges: FlowEdge[] } {
-  const nodes: FlowNode[] = [];
-  const edges: FlowEdge[] = [];
-  const nodeMap = new Map<string, FlowNode>();
-  const sceneOrder = gameData.scene_order || Object.keys(gameData.scenes);
+  unlockedScenes: Set<string>,
+): { nodes: FNode[]; edges: FEdge[] } {
+  const nodes: FNode[] = [];
+  const edges: FEdge[] = [];
+  const nodeMap = new Map<string, FNode>();
+  const startScene =
+    gameData.start_scene || Object.keys(gameData.scenes)[0];
+  if (!unlockedScenes.has(startScene)) return { nodes, edges };
 
-  // Vertical layout settings
-  const rowHeight = 100;
-  const colWidth = 200;
-  let row = 0;
+  /* 1 ─ collect outgoing connections per scene */
+  const sceneConns = new Map<
+    string,
+    { choices: { target: string; label?: string }[][]; jumps: string[] }
+  >();
 
-  // First pass: create chapter nodes (only for unlocked scenes)
-  for (const sceneKey of sceneOrder) {
-    const scene = gameData.scenes[sceneKey];
-    if (!scene) continue;
+  for (const sceneKey of Object.keys(gameData.scenes)) {
     if (!unlockedScenes.has(sceneKey)) continue;
-
-    let label = sceneKey;
-    for (const cmd of scene.commands) {
-      if (cmd.type === "chapter_title") {
-        label = (cmd as { text: string }).text;
-        const sub = (cmd as { subtitle?: string }).subtitle;
-        if (sub) label += `\n${sub}`;
-        break;
-      }
-    }
-
-    const node: FlowNode = {
-      id: sceneKey,
-      label,
-      type: "chapter",
-      x: 0, // will be calculated later
-      y: 50 + row * rowHeight,
-      unlocked: true,
-    };
-    nodes.push(node);
-    nodeMap.set(sceneKey, node);
-    row++;
-  }
-
-  // Second pass: scan for choices and jumps
-  let choiceId = 0;
-  for (const sceneKey of sceneOrder) {
     const scene = gameData.scenes[sceneKey];
-    if (!scene || !unlockedScenes.has(sceneKey)) continue;
+    const choices: { target: string; label?: string }[][] = [];
+    const jumps: string[] = [];
 
-    const scanCommands = (cmds: Command[]) => {
-      for (const cmd of cmds) {
-        if (cmd.type === "choice") {
-          const choiceCmd = cmd as ChoiceCommand;
-          const parentNode = nodeMap.get(sceneKey);
-          if (!parentNode) continue;
-
-          // Get valid jump targets (only show unlocked ones)
-          const validOptions = choiceCmd.options.filter(
-            (opt) => opt.jump && unlockedScenes.has(opt.jump) && nodeMap.has(opt.jump)
-          );
-          if (validOptions.length === 0) continue;
-
-          const cId = `choice_${choiceId++}`;
-          const choiceNode: FlowNode = {
-            id: cId,
-            label: "选择",
-            type: "choice",
-            x: parentNode.x,
-            y: parentNode.y + rowHeight * 0.5,
-            unlocked: true,
-          };
-          nodes.push(choiceNode);
-          nodeMap.set(cId, choiceNode);
-          edges.push({ from: sceneKey, to: cId });
-
-          for (const opt of validOptions) {
-            if (opt.jump && nodeMap.has(opt.jump)) {
-              edges.push({ from: cId, to: opt.jump, label: opt.text });
-            }
-          }
-        } else if (cmd.type === "jump") {
-          const target = (cmd as { target: string }).target;
-          if (unlockedScenes.has(target) && nodeMap.has(target)) {
-            edges.push({ from: sceneKey, to: target });
-          }
-        }
+    for (const cmd of scene.commands) {
+      if (cmd.type === "choice") {
+        const c = cmd as ChoiceCommand;
+        const opts = c.options
+          .filter((o) => o.jump && unlockedScenes.has(o.jump))
+          .map((o) => ({ target: o.jump!, label: o.text }));
+        if (opts.length > 0) choices.push(opts);
+      } else if (cmd.type === "jump") {
+        const t = (cmd as { target: string }).target;
+        if (unlockedScenes.has(t)) jumps.push(t);
       }
-    };
-    scanCommands(scene.commands);
+    }
+    sceneConns.set(sceneKey, { choices, jumps });
   }
 
-  // Layout calculation: find connected groups and arrange
-  // Chapter nodes in a vertical column, branching choices spread horizontally
-  const chapterNodes = nodes.filter((n) => n.type === "chapter");
-  const choiceNodes = nodes.filter((n) => n.type === "choice");
+  /* 2 ─ BFS → assign row (longest-path depth) */
+  const rowOf = new Map<string, number>();
+  rowOf.set(startScene, 0);
+  const queue = [startScene];
 
-  // Center chapter nodes vertically
-  const centerX = 300;
-  chapterNodes.forEach((n, i) => {
-    n.x = centerX;
-    n.y = 50 + i * rowHeight;
-  });
+  while (queue.length > 0) {
+    const cur = queue.shift()!;
+    const r = rowOf.get(cur)!;
+    const conn = sceneConns.get(cur);
+    if (!conn) continue;
 
-  // Place choice nodes between their parent and targets
-  for (const cn of choiceNodes) {
-    const parentEdge = edges.find((e) => e.to === cn.id);
-    if (parentEdge) {
-      const parent = nodeMap.get(parentEdge.from);
-      if (parent) {
-        cn.x = parent.x;
-        cn.y = parent.y + rowHeight * 0.55;
+    const next = new Set<string>();
+    for (const ch of conn.choices) for (const o of ch) next.add(o.target);
+    for (const j of conn.jumps) next.add(j);
+
+    for (const nk of next) {
+      const nr = r + 1;
+      if (!rowOf.has(nk) || rowOf.get(nk)! < nr) {
+        rowOf.set(nk, nr);
+        queue.push(nk);
       }
     }
   }
 
-  // Spread target nodes horizontally when a choice connects to multiple chapters
-  for (const cn of choiceNodes) {
-    const childEdges = edges.filter((e) => e.from === cn.id && e.to !== cn.id);
-    if (childEdges.length > 1) {
-      const totalWidth = (childEdges.length - 1) * colWidth;
-      childEdges.forEach((edge, i) => {
-        const target = nodeMap.get(edge.to);
-        if (target && target.type === "chapter") {
-          target.x = cn.x - totalWidth / 2 + i * colWidth;
+  /* 3 ─ group scenes by row */
+  const rowGroups = new Map<number, string[]>();
+  for (const [sk, r] of rowOf) {
+    if (!rowGroups.has(r)) rowGroups.set(r, []);
+    rowGroups.get(r)!.push(sk);
+  }
+
+  /* 4 ─ place chapter nodes (centered, spread when siblings) */
+  for (const [row, scenes] of rowGroups) {
+    const n = scenes.length;
+    scenes.forEach((sk, i) => {
+      const scene = gameData.scenes[sk];
+      let label = sk;
+      for (const cmd of scene.commands) {
+        if (cmd.type === "chapter_title") {
+          label = (cmd as { text: string }).text;
+          const sub = (cmd as { subtitle?: string }).subtitle;
+          if (sub) label += "\n" + sub;
+          break;
         }
-      });
+      }
+      const cx = CX + (i - (n - 1) / 2) * COL_W;
+      const node: FNode = {
+        id: sk,
+        label,
+        type: "chapter",
+        cx,
+        y: PAD_T + row * ROW_H,
+      };
+      nodes.push(node);
+      nodeMap.set(sk, node);
+    });
+  }
+
+  /* 5 ─ insert choice nodes + edges */
+  let ci = 0;
+  for (const [sk, conn] of sceneConns) {
+    const parent = nodeMap.get(sk);
+    if (!parent) continue;
+
+    for (const choiceOpts of conn.choices) {
+      const valid = choiceOpts.filter((o) => nodeMap.has(o.target));
+      if (valid.length === 0) continue;
+
+      const cId = `choice_${ci++}`;
+      const cNode: FNode = {
+        id: cId,
+        label: "选择",
+        type: "choice",
+        cx: parent.cx,
+        y: parent.y + CH_H + 16,
+      };
+      nodes.push(cNode);
+      nodeMap.set(cId, cNode);
+      edges.push({ from: sk, to: cId });
+      for (const o of valid)
+        edges.push({ from: cId, to: o.target, label: o.label });
+    }
+
+    for (const j of conn.jumps) {
+      if (nodeMap.has(j)) edges.push({ from: sk, to: j });
     }
   }
 
   return { nodes, edges };
+}
+
+/* ─── Edge path helpers ─── */
+
+/** Brace path: down → rounded corner → horizontal → rounded corner → down */
+function bracePath(
+  fromCx: number,
+  fromBottom: number,
+  toCx: number,
+  toTop: number,
+): string {
+  if (Math.abs(fromCx - toCx) < 2)
+    return `M${fromCx},${fromBottom} L${fromCx},${toTop}`;
+
+  const bracketY = fromBottom + BRACE_GAP;
+  const sign = toCx > fromCx ? 1 : -1;
+  const r = Math.min(
+    CORNER_R,
+    Math.abs(toCx - fromCx) / 2,
+    BRACE_GAP / 2,
+  );
+  return [
+    `M${fromCx},${fromBottom}`,
+    `L${fromCx},${bracketY - r}`,
+    `Q${fromCx},${bracketY} ${fromCx + sign * r},${bracketY}`,
+    `L${toCx - sign * r},${bracketY}`,
+    `Q${toCx},${bracketY} ${toCx},${bracketY + r}`,
+    `L${toCx},${toTop}`,
+  ].join(" ");
+}
+
+/** Smooth S-curve for simple jump edges */
+function curvePath(
+  fromCx: number,
+  fromBottom: number,
+  toCx: number,
+  toTop: number,
+): string {
+  if (Math.abs(fromCx - toCx) < 2)
+    return `M${fromCx},${fromBottom} L${fromCx},${toTop}`;
+  const midY = (fromBottom + toTop) / 2;
+  return `M${fromCx},${fromBottom} C${fromCx},${midY} ${toCx},${midY} ${toCx},${toTop}`;
 }
 
 export default function ProgressPanel() {
@@ -164,109 +216,255 @@ export default function ProgressPanel() {
   const dragStart = useRef({ x: 0, y: 0 });
   const offsetStart = useRef({ x: 0, y: 0 });
 
-  // Calculate unlocked scenes: all scenes from saves + all up to current scene
   const unlockedScenes = useMemo(() => {
     if (!gameData) return new Set<string>();
     const unlocked = new Set<string>();
     const sceneOrder = gameData.scene_order || Object.keys(gameData.scenes);
 
-    // Scenes from saves
     for (const slot of saves) {
       if (slot) {
         unlocked.add(slot.sceneKey);
-        // Also unlock all scenes before this one in scene_order
         const idx = sceneOrder.indexOf(slot.sceneKey);
-        for (let i = 0; i <= idx; i++) {
-          unlocked.add(sceneOrder[i]);
-        }
+        for (let i = 0; i <= idx; i++) unlocked.add(sceneOrder[i]);
       }
     }
 
-    // Current progress
     if (currentSceneKey) {
       unlocked.add(currentSceneKey);
       const idx = sceneOrder.indexOf(currentSceneKey);
-      for (let i = 0; i <= idx; i++) {
-        unlocked.add(sceneOrder[i]);
-      }
+      for (let i = 0; i <= idx; i++) unlocked.add(sceneOrder[i]);
     }
 
     return unlocked;
   }, [gameData, saves, currentSceneKey]);
 
   const { nodes, edges } = useMemo(() => {
-    if (!gameData) return { nodes: [], edges: [] };
+    if (!gameData) return { nodes: [] as FNode[], edges: [] as FEdge[] };
     return buildFlowGraph(gameData, unlockedScenes);
   }, [gameData, unlockedScenes]);
 
-  // Drag handlers
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest("[data-node]")) return;
-    setDragging(true);
-    dragStart.current = { x: e.clientX, y: e.clientY };
-    offsetStart.current = { ...offset };
-  }, [offset]);
+  /* Build a quick lookup: choiceId → outgoing edge count */
+  const choiceFanOut = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const e of edges) {
+      if (e.from.startsWith("choice_")) {
+        map.set(e.from, (map.get(e.from) ?? 0) + 1);
+      }
+    }
+    return map;
+  }, [edges]);
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!dragging) return;
-    setOffset({
-      x: offsetStart.current.x + (e.clientX - dragStart.current.x),
-      y: offsetStart.current.y + (e.clientY - dragStart.current.y),
-    });
-  }, [dragging]);
+  const nodeMap = useMemo(() => {
+    const m = new Map<string, FNode>();
+    for (const n of nodes) m.set(n.id, n);
+    return m;
+  }, [nodes]);
 
-  const handleMouseUp = useCallback(() => {
-    setDragging(false);
-  }, []);
+  /* ─── drag handlers ─── */
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if ((e.target as HTMLElement).closest("[data-node]")) return;
+      setDragging(true);
+      dragStart.current = { x: e.clientX, y: e.clientY };
+      offsetStart.current = { ...offset };
+    },
+    [offset],
+  );
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (!dragging) return;
+      setOffset({
+        x: offsetStart.current.x + (e.clientX - dragStart.current.x),
+        y: offsetStart.current.y + (e.clientY - dragStart.current.y),
+      });
+    },
+    [dragging],
+  );
+  const handleMouseUp = useCallback(() => setDragging(false), []);
 
-  // Touch handlers for mobile
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if ((e.target as HTMLElement).closest("[data-node]")) return;
-    const t = e.touches[0];
-    setDragging(true);
-    dragStart.current = { x: t.clientX, y: t.clientY };
-    offsetStart.current = { ...offset };
-  }, [offset]);
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      if ((e.target as HTMLElement).closest("[data-node]")) return;
+      const t = e.touches[0];
+      setDragging(true);
+      dragStart.current = { x: t.clientX, y: t.clientY };
+      offsetStart.current = { ...offset };
+    },
+    [offset],
+  );
+  const handleTouchMove = useCallback(
+    (e: React.TouchEvent) => {
+      if (!dragging) return;
+      const t = e.touches[0];
+      setOffset({
+        x: offsetStart.current.x + (t.clientX - dragStart.current.x),
+        y: offsetStart.current.y + (t.clientY - dragStart.current.y),
+      });
+    },
+    [dragging],
+  );
 
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!dragging) return;
-    const t = e.touches[0];
-    setOffset({
-      x: offsetStart.current.x + (t.clientX - dragStart.current.x),
-      y: offsetStart.current.y + (t.clientY - dragStart.current.y),
-    });
-  }, [dragging]);
-
-  // Center the view on first render
   useEffect(() => {
     if (nodes.length > 0 && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
-      const maxX = Math.max(...nodes.map((n) => n.x)) + 200;
-      const centerX = (rect.width - maxX) / 2;
-      setOffset({ x: Math.max(0, centerX), y: 0 });
+      const maxCx = Math.max(...nodes.map((n) => n.cx));
+      const svgW = maxCx + CH_W;
+      setOffset({ x: Math.max(0, (rect.width - svgW) / 2), y: 0 });
     }
   }, [nodes.length]);
 
   if (screen !== "progress" || !gameData) return null;
 
   const handleNodeClick = (nodeId: string) => {
-    const node = nodes.find((n) => n.id === nodeId);
-    if (!node || !node.unlocked || node.type !== "chapter") return;
+    const node = nodeMap.get(nodeId);
+    if (!node || node.type !== "chapter") return;
     if (gameData.scenes[nodeId]) {
       jumpToScene(nodeId);
       setScreen("game");
     }
   };
 
-  // SVG dimensions (vertical layout)
-  const svgWidth = nodes.length > 0 ? Math.max(700, Math.max(...nodes.map((n) => n.x)) + 300) : 700;
-  const svgHeight = nodes.length > 0 ? Math.max(400, Math.max(...nodes.map((n) => n.y)) + 150) : 400;
+  /* ─── SVG size ─── */
+  const svgWidth =
+    nodes.length > 0
+      ? Math.max(700, Math.max(...nodes.map((n) => n.cx)) + CH_W + 80)
+      : 700;
+  const svgHeight =
+    nodes.length > 0
+      ? Math.max(400, Math.max(...nodes.map((n) => n.y)) + CH_H + 80)
+      : 400;
+
+  /* ─── render an edge ─── */
+  const renderEdge = (edge: FEdge, i: number) => {
+    const from = nodeMap.get(edge.from);
+    const to = nodeMap.get(edge.to);
+    if (!from || !to) return null;
+
+    const fromIsChapter = from.type === "chapter";
+    const toIsChapter = to.type === "chapter";
+    const fromH = fromIsChapter ? CH_H : C_H;
+
+    const fromCx = from.cx;
+    const fromBottom = from.y + fromH;
+    const toCx = to.cx;
+    const toTop = to.y;
+
+    const isChoiceBranch =
+      from.type === "choice" && (choiceFanOut.get(from.id) ?? 0) > 1;
+
+    const d = isChoiceBranch
+      ? bracePath(fromCx, fromBottom, toCx, toTop)
+      : fromIsChapter && toIsChapter
+        ? curvePath(fromCx, fromBottom, toCx, toTop)
+        : `M${fromCx},${fromBottom} L${toCx},${toTop}`;
+
+    /* label position for brace edges */
+    let labelX = (fromCx + toCx) / 2;
+    let labelY = (fromBottom + toTop) / 2 - 6;
+    if (isChoiceBranch) {
+      const bracketY = fromBottom + BRACE_GAP;
+      labelX = (fromCx + toCx) / 2;
+      labelY = bracketY - 6;
+    }
+
+    return (
+      <g key={`e-${i}`}>
+        <path
+          d={d}
+          fill="none"
+          stroke="#6b7280"
+          strokeWidth={1.8}
+          markerEnd="url(#arrow)"
+        />
+        {edge.label && (
+          <text
+            x={labelX}
+            y={labelY}
+            textAnchor="middle"
+            className="text-[10px] fill-gray-500 font-medium"
+          >
+            {edge.label.length > 14
+              ? edge.label.slice(0, 14) + "…"
+              : edge.label}
+          </text>
+        )}
+      </g>
+    );
+  };
+
+  /* ─── render a node ─── */
+  const renderNode = (node: FNode) => {
+    const isChapter = node.type === "chapter";
+    const isCurrent = node.id === currentSceneKey;
+    const w = isChapter ? CH_W : C_W;
+    const h = isChapter ? CH_H : C_H;
+    const rx = node.cx - w / 2;
+
+    const lines = node.label.split("\n");
+    const title =
+      lines[0].length > 14 ? lines[0].slice(0, 14) + "…" : lines[0];
+    const subtitle = lines[1] || "";
+
+    return (
+      <g
+        key={node.id}
+        data-node
+        onClick={() => handleNodeClick(node.id)}
+        className={isChapter ? "cursor-pointer" : ""}
+      >
+        {isChapter ? (
+          <rect
+            x={rx}
+            y={node.y}
+            width={w}
+            height={h}
+            rx={8}
+            fill={isCurrent ? "#3b82f6" : "#ffffff"}
+            stroke={isCurrent ? "#2563eb" : "#9ca3af"}
+            strokeWidth={isCurrent ? 2.5 : 1.5}
+            className="hover:fill-blue-50"
+          />
+        ) : (
+          /* diamond for choice nodes */
+          <polygon
+            points={`${node.cx},${node.y} ${node.cx + w / 2},${node.y + h / 2} ${node.cx},${node.y + h} ${node.cx - w / 2},${node.y + h / 2}`}
+            fill="#fef3c7"
+            stroke="#f59e0b"
+            strokeWidth={1.5}
+          />
+        )}
+        <text
+          x={node.cx}
+          y={node.y + (subtitle ? h / 2 - 7 : h / 2)}
+          textAnchor="middle"
+          dominantBaseline="central"
+          className={`text-xs ${isCurrent ? "fill-white font-bold" : "fill-gray-700"}`}
+        >
+          {title}
+        </text>
+        {subtitle && (
+          <text
+            x={node.cx}
+            y={node.y + h / 2 + 7}
+            textAnchor="middle"
+            dominantBaseline="central"
+            className={`text-[10px] ${isCurrent ? "fill-white/80" : "fill-gray-400"}`}
+          >
+            {subtitle}
+          </text>
+        )}
+      </g>
+    );
+  };
 
   return (
     <div className="absolute inset-0 z-50 flex flex-col">
-      {/* Background image */}
       {background && (
-        <img src={background} alt="" className="absolute inset-0 w-full h-full object-cover" />
+        <img
+          src={background}
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover"
+        />
       )}
       <div className="absolute inset-0 bg-white/40 backdrop-blur-md" />
 
@@ -282,7 +480,7 @@ export default function ProgressPanel() {
         </div>
 
         <div className="text-xs text-gray-500 px-6 py-2">
-          拖拽移动 · 点击已解锁的章节节点可跳转
+          拖拽移动 · 点击章节节点可跳转
         </div>
 
         <div
@@ -299,55 +497,14 @@ export default function ProgressPanel() {
           <svg
             width={svgWidth}
             height={svgHeight}
-            style={{ transform: `translate(${offset.x}px, ${offset.y}px)` }}
+            style={{
+              transform: `translate(${offset.x}px, ${offset.y}px)`,
+            }}
             className="select-none"
           >
-            {/* Edges */}
-            {edges.map((edge, i) => {
-              const fromNode = nodes.find((n) => n.id === edge.from);
-              const toNode = nodes.find((n) => n.id === edge.to);
-              if (!fromNode || !toNode) return null;
-
-              const fromW = fromNode.type === "chapter" ? 160 : 80;
-              const fromH = fromNode.type === "chapter" ? 44 : 28;
-              const toW = toNode.type === "chapter" ? 160 : 80;
-
-              const x1 = fromNode.x + fromW / 2;
-              const y1 = fromNode.y + fromH;
-              const x2 = toNode.x + toW / 2;
-              const y2 = toNode.y;
-
-              // Vertical curved path
-              const midY = (y1 + y2) / 2;
-              const path = `M${x1},${y1} C${x1},${midY} ${x2},${midY} ${x2},${y2}`;
-
-              return (
-                <g key={`edge-${i}`}>
-                  <path
-                    d={path}
-                    fill="none"
-                    stroke={fromNode.unlocked && toNode.unlocked ? "#6b7280" : "#d1d5db"}
-                    strokeWidth={2}
-                    markerEnd="url(#arrowhead)"
-                  />
-                  {edge.label && (
-                    <text
-                      x={(x1 + x2) / 2}
-                      y={midY - 8}
-                      textAnchor="middle"
-                      className="text-[10px] fill-gray-400"
-                    >
-                      {edge.label.length > 12 ? edge.label.slice(0, 12) + "…" : edge.label}
-                    </text>
-                  )}
-                </g>
-              );
-            })}
-
-            {/* Arrow marker */}
             <defs>
               <marker
-                id="arrowhead"
+                id="arrow"
                 markerWidth="8"
                 markerHeight="6"
                 refX="8"
@@ -357,72 +514,8 @@ export default function ProgressPanel() {
                 <polygon points="0 0, 8 3, 0 6" fill="#6b7280" />
               </marker>
             </defs>
-
-            {/* Nodes — only unlocked scenes are rendered */}
-            {nodes.map((node) => {
-              const isChapter = node.type === "chapter";
-              const isCurrent = node.id === currentSceneKey;
-              const w = isChapter ? 160 : 80;
-              const h = isChapter ? 44 : 28;
-
-              // Display label: show both title lines for chapter nodes
-              const lines = node.label.split("\n");
-              const displayLabel = lines[0].length > 14 ? lines[0].slice(0, 14) + "…" : lines[0];
-              const subtitle = lines[1] || "";
-
-              return (
-                <g
-                  key={node.id}
-                  data-node
-                  onClick={() => handleNodeClick(node.id)}
-                  className={isChapter ? "cursor-pointer" : ""}
-                >
-                  <rect
-                    x={node.x}
-                    y={node.y}
-                    width={w}
-                    height={h}
-                    rx={isChapter ? 8 : 14}
-                    fill={
-                      isCurrent
-                        ? "#3b82f6"
-                        : isChapter
-                          ? "#ffffff"
-                          : "#fef3c7"
-                    }
-                    stroke={
-                      isCurrent
-                        ? "#2563eb"
-                        : isChapter
-                          ? "#9ca3af"
-                          : "#f59e0b"
-                    }
-                    strokeWidth={isCurrent ? 2.5 : 1.5}
-                    className={isChapter ? "hover:fill-blue-50" : ""}
-                  />
-                  <text
-                    x={node.x + w / 2}
-                    y={node.y + (subtitle ? h / 2 - 7 : h / 2)}
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                    className={`text-xs ${isCurrent ? "fill-white font-bold" : "fill-gray-700"}`}
-                  >
-                    {displayLabel}
-                  </text>
-                  {subtitle && (
-                    <text
-                      x={node.x + w / 2}
-                      y={node.y + h / 2 + 7}
-                      textAnchor="middle"
-                      dominantBaseline="central"
-                      className={`text-[10px] ${isCurrent ? "fill-white/80" : "fill-gray-400"}`}
-                    >
-                      {subtitle}
-                    </text>
-                  )}
-                </g>
-              );
-            })}
+            {edges.map(renderEdge)}
+            {nodes.map(renderNode)}
           </svg>
         </div>
       </div>
