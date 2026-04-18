@@ -98,6 +98,7 @@ export interface GameState {
   advanceCommand: () => void;
   executeCommand: (cmd: Command) => void;
   selectChoice: (option: ChoiceOption) => void;
+  dismissChapterTitle: () => void;
   jumpToScene: (sceneKey: string) => void;
   finishTyping: () => void;
   toggleAutoMode: () => void;
@@ -361,8 +362,7 @@ export const useGameStore = create<GameState>((set, get) => {
           chapterSubtitle: cmd.subtitle || "",
         });
         setTimeout(() => {
-          set({ showChapterTitle: false });
-          get().advanceCommand();
+          get().dismissChapterTitle();
         }, 3000);
         break;
       }
@@ -581,6 +581,12 @@ export const useGameStore = create<GameState>((set, get) => {
       } else {
         get().advanceCommand();
       }
+    },
+
+    dismissChapterTitle: () => {
+      if (!get().showChapterTitle) return;
+      set({ showChapterTitle: false });
+      get().advanceCommand();
     },
 
     jumpToScene: (sceneKey: string) => {
