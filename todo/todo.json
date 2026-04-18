@@ -62,8 +62,8 @@
       "priority": "P1",
       "depends_on": [],
       "acceptance": "新增可拖拽流程图面板，显示章节分支节点，点击跳转，解锁逻辑正确",
-      "notes": "新增 ProgressPanel.tsx，SVG 绘制节点+边，支持拖拽、点击跳转、解锁逻辑",
-      "last_updated": "2026-04-18T13:00:00Z"
+      "notes": "ProgressPanel.tsx 垂直布局，仅显示已解锁章节，隐藏未解锁节点",
+      "last_updated": "2026-04-18T14:00:00Z"
     },
     {
       "id": "T007",
@@ -72,8 +72,18 @@
       "priority": "P1",
       "depends_on": ["T001", "T002", "T003", "T004", "T005", "T006"],
       "acceptance": "创建全中文 demo game_data.json 展示所有新功能",
-      "notes": "demo_game_data.json - 星海学园：命运的抉择，4个角色，7个场景，5个结局",
-      "last_updated": "2026-04-18T13:00:00Z"
+      "notes": "功能引导演示，2个角色，4个场景，1个结局，测试全部引擎功能",
+      "last_updated": "2026-04-18T14:00:00Z"
+    },
+    {
+      "id": "T008",
+      "title": "修复选项阻塞逻辑",
+      "status": "done",
+      "priority": "P0",
+      "depends_on": [],
+      "acceptance": "选择分支时只有点击选项才能推进，点击其他地方不会跳过",
+      "notes": "advanceCommand 添加 waitingForChoice 守卫",
+      "last_updated": "2026-04-18T14:00:00Z"
     }
   ]
 }

@@ -26,17 +26,17 @@ function buildFlowGraph(
   const nodeMap = new Map<string, FlowNode>();
   const sceneOrder = gameData.scene_order || Object.keys(gameData.scenes);
 
-  // Layout settings
-  const colWidth = 220;
+  // Vertical layout settings
   const rowHeight = 100;
-  let col = 0;
+  const colWidth = 200;
+  let row = 0;
 
-  // Create nodes for each scene
+  // First pass: create chapter nodes (only for unlocked scenes)
   for (const sceneKey of sceneOrder) {
     const scene = gameData.scenes[sceneKey];
     if (!scene) continue;
+    if (!unlockedScenes.has(sceneKey)) continue;
 
-    // Find chapter title in commands
     let label = sceneKey;
     for (const cmd of scene.commands) {
       if (cmd.type === "chapter_title") {
@@ -51,54 +51,55 @@ function buildFlowGraph(
       id: sceneKey,
       label,
       type: "chapter",
-      x: 80 + col * colWidth,
-      y: 60,
-      unlocked: unlockedScenes.has(sceneKey),
+      x: 0, // will be calculated later
+      y: 50 + row * rowHeight,
+      unlocked: true,
     };
     nodes.push(node);
     nodeMap.set(sceneKey, node);
-    col++;
+    row++;
   }
 
-  // Scan for choice commands that jump to other scenes
+  // Second pass: scan for choices and jumps
   let choiceId = 0;
   for (const sceneKey of sceneOrder) {
     const scene = gameData.scenes[sceneKey];
-    if (!scene) continue;
+    if (!scene || !unlockedScenes.has(sceneKey)) continue;
 
-    // Track if this scene has explicit jumps or choices
     const scanCommands = (cmds: Command[]) => {
       for (const cmd of cmds) {
         if (cmd.type === "choice") {
           const choiceCmd = cmd as ChoiceCommand;
-          const cId = `choice_${choiceId++}`;
           const parentNode = nodeMap.get(sceneKey);
           if (!parentNode) continue;
 
-          // Create choice node
+          // Get valid jump targets (only show unlocked ones)
+          const validOptions = choiceCmd.options.filter(
+            (opt) => opt.jump && unlockedScenes.has(opt.jump) && nodeMap.has(opt.jump)
+          );
+          if (validOptions.length === 0) continue;
+
+          const cId = `choice_${choiceId++}`;
           const choiceNode: FlowNode = {
             id: cId,
             label: "选择",
             type: "choice",
             x: parentNode.x,
-            y: parentNode.y + rowHeight,
-            unlocked: parentNode.unlocked,
+            y: parentNode.y + rowHeight * 0.5,
+            unlocked: true,
           };
           nodes.push(choiceNode);
           nodeMap.set(cId, choiceNode);
           edges.push({ from: sceneKey, to: cId });
 
-          // Connect to jump targets
-          let optIdx = 0;
-          for (const opt of choiceCmd.options) {
+          for (const opt of validOptions) {
             if (opt.jump && nodeMap.has(opt.jump)) {
               edges.push({ from: cId, to: opt.jump, label: opt.text });
             }
-            optIdx++;
           }
         } else if (cmd.type === "jump") {
           const target = (cmd as { target: string }).target;
-          if (nodeMap.has(target)) {
+          if (unlockedScenes.has(target) && nodeMap.has(target)) {
             edges.push({ from: sceneKey, to: target });
           }
         }
@@ -107,27 +108,41 @@ function buildFlowGraph(
     scanCommands(scene.commands);
   }
 
-  // Re-layout: use a simple layered layout
-  // Top row: chapter nodes without choice leading to them
-  // Choice nodes below their parent
+  // Layout calculation: find connected groups and arrange
+  // Chapter nodes in a vertical column, branching choices spread horizontally
   const chapterNodes = nodes.filter((n) => n.type === "chapter");
   const choiceNodes = nodes.filter((n) => n.type === "choice");
 
-  // Horizontal layout for chapters
+  // Center chapter nodes vertically
+  const centerX = 300;
   chapterNodes.forEach((n, i) => {
-    n.x = 80 + i * colWidth;
-    n.y = 60;
+    n.x = centerX;
+    n.y = 50 + i * rowHeight;
   });
 
-  // Place choice nodes below their parent
+  // Place choice nodes between their parent and targets
   for (const cn of choiceNodes) {
     const parentEdge = edges.find((e) => e.to === cn.id);
     if (parentEdge) {
       const parent = nodeMap.get(parentEdge.from);
       if (parent) {
         cn.x = parent.x;
-        cn.y = parent.y + rowHeight;
+        cn.y = parent.y + rowHeight * 0.55;
       }
+    }
+  }
+
+  // Spread target nodes horizontally when a choice connects to multiple chapters
+  for (const cn of choiceNodes) {
+    const childEdges = edges.filter((e) => e.from === cn.id && e.to !== cn.id);
+    if (childEdges.length > 1) {
+      const totalWidth = (childEdges.length - 1) * colWidth;
+      childEdges.forEach((edge, i) => {
+        const target = nodeMap.get(edge.to);
+        if (target && target.type === "chapter") {
+          target.x = cn.x - totalWidth / 2 + i * colWidth;
+        }
+      });
     }
   }
 
@@ -228,7 +243,7 @@ export default function ProgressPanel() {
       const rect = containerRef.current.getBoundingClientRect();
       const maxX = Math.max(...nodes.map((n) => n.x)) + 200;
       const centerX = (rect.width - maxX) / 2;
-      setOffset({ x: Math.min(0, centerX), y: 0 });
+      setOffset({ x: Math.max(0, centerX), y: 0 });
     }
   }, [nodes.length]);
 
@@ -243,9 +258,9 @@ export default function ProgressPanel() {
     }
   };
 
-  // SVG dimensions
-  const svgWidth = Math.max(800, Math.max(...nodes.map((n) => n.x)) + 300);
-  const svgHeight = Math.max(400, Math.max(...nodes.map((n) => n.y)) + 200);
+  // SVG dimensions (vertical layout)
+  const svgWidth = nodes.length > 0 ? Math.max(700, Math.max(...nodes.map((n) => n.x)) + 300) : 700;
+  const svgHeight = nodes.length > 0 ? Math.max(400, Math.max(...nodes.map((n) => n.y)) + 150) : 400;
 
   return (
     <div className="absolute inset-0 z-50 flex flex-col">
@@ -293,12 +308,16 @@ export default function ProgressPanel() {
               const toNode = nodes.find((n) => n.id === edge.to);
               if (!fromNode || !toNode) return null;
 
-              const x1 = fromNode.x + 80;
-              const y1 = fromNode.y + (fromNode.type === "choice" ? 25 : 20);
-              const x2 = toNode.x + 80;
+              const fromW = fromNode.type === "chapter" ? 160 : 80;
+              const fromH = fromNode.type === "chapter" ? 44 : 28;
+              const toW = toNode.type === "chapter" ? 160 : 80;
+
+              const x1 = fromNode.x + fromW / 2;
+              const y1 = fromNode.y + fromH;
+              const x2 = toNode.x + toW / 2;
               const y2 = toNode.y;
 
-              // Curved path
+              // Vertical curved path
               const midY = (y1 + y2) / 2;
               const path = `M${x1},${y1} C${x1},${midY} ${x2},${midY} ${x2},${y2}`;
 
@@ -339,66 +358,68 @@ export default function ProgressPanel() {
               </marker>
             </defs>
 
-            {/* Nodes */}
+            {/* Nodes — only unlocked scenes are rendered */}
             {nodes.map((node) => {
               const isChapter = node.type === "chapter";
               const isCurrent = node.id === currentSceneKey;
               const w = isChapter ? 160 : 80;
-              const h = isChapter ? 40 : 28;
+              const h = isChapter ? 44 : 28;
+
+              // Display label: show both title lines for chapter nodes
+              const lines = node.label.split("\n");
+              const displayLabel = lines[0].length > 14 ? lines[0].slice(0, 14) + "…" : lines[0];
+              const subtitle = lines[1] || "";
 
               return (
                 <g
                   key={node.id}
                   data-node
                   onClick={() => handleNodeClick(node.id)}
-                  className={node.unlocked && isChapter ? "cursor-pointer" : ""}
+                  className={isChapter ? "cursor-pointer" : ""}
                 >
                   <rect
-                    x={node.x + 80 - w / 2}
+                    x={node.x}
                     y={node.y}
                     width={w}
                     height={h}
                     rx={isChapter ? 8 : 14}
                     fill={
-                      !node.unlocked
-                        ? "#e5e7eb"
-                        : isCurrent
-                          ? "#3b82f6"
-                          : isChapter
-                            ? "#ffffff"
-                            : "#fef3c7"
+                      isCurrent
+                        ? "#3b82f6"
+                        : isChapter
+                          ? "#ffffff"
+                          : "#fef3c7"
                     }
                     stroke={
-                      !node.unlocked
-                        ? "#d1d5db"
-                        : isCurrent
-                          ? "#2563eb"
-                          : isChapter
-                            ? "#9ca3af"
-                            : "#f59e0b"
+                      isCurrent
+                        ? "#2563eb"
+                        : isChapter
+                          ? "#9ca3af"
+                          : "#f59e0b"
                     }
                     strokeWidth={isCurrent ? 2.5 : 1.5}
-                    className={node.unlocked && isChapter ? "hover:fill-blue-50" : ""}
+                    className={isChapter ? "hover:fill-blue-50" : ""}
                   />
                   <text
-                    x={node.x + 80}
-                    y={node.y + h / 2}
+                    x={node.x + w / 2}
+                    y={node.y + (subtitle ? h / 2 - 7 : h / 2)}
                     textAnchor="middle"
                     dominantBaseline="central"
-                    className={`text-xs ${
-                      !node.unlocked
-                        ? "fill-gray-400"
-                        : isCurrent
-                          ? "fill-white font-bold"
-                          : "fill-gray-700"
-                    }`}
+                    className={`text-xs ${isCurrent ? "fill-white font-bold" : "fill-gray-700"}`}
                   >
-                    {node.unlocked
-                      ? node.label.split("\n")[0].length > 14
-                        ? node.label.split("\n")[0].slice(0, 14) + "…"
-                        : node.label.split("\n")[0]
-                      : "???"}
+                    {displayLabel}
                   </text>
+                  {subtitle && (
+                    <text
+                      x={node.x + w / 2}
+                      y={node.y + h / 2 + 7}
+                      textAnchor="middle"
+                      dominantBaseline="central"
+                      className={`text-[10px] ${isCurrent ? "fill-white/80" : "fill-gray-400"}`}
+                    >
+                      {subtitle}
+                    </text>
+                  )}
                 </g>
               );
             })}

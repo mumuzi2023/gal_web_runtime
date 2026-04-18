@@ -524,6 +524,8 @@ export const useGameStore = create<GameState>((set, get) => {
 
     advanceCommand: () => {
       const state = get();
+      // Do NOT advance while waiting for a choice selection
+      if (state.waitingForChoice) return;
       // Stop voice from previous command when advancing
       set({ currentVoice: null });
       const nextIndex = state.commandIndex + 1;

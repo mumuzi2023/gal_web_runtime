@@ -1,9 +1,9 @@
 {
   "meta": {
-    "title": "星海学园：命运的抉择",
-    "author": "GalGame 演示",
+    "title": "功能引导演示",
+    "author": "系统",
     "version": "1.0.0",
-    "description": "在宇宙历2247年，少年林星辰转入星海学园，遇到三位性格各异的少女，在校园日常中探索友情、梦想与命运的交织。每一个选择都将影响故事的走向，通往不同的结局。"
+    "description": "一个简短的引导演示，用于测试 GalGame 运行时引擎的全部功能。"
   },
   "config": {
     "ui": {
@@ -12,280 +12,118 @@
     }
   },
   "characters": {
-    "lin_xingchen": {
-      "name": "林星辰",
+    "guide": {
+      "name": "向导",
       "color": "#4A90D9",
       "expressions": {
         "normal": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/characters/小林悠/normal.png",
         "happy": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/characters/小林悠/happy.png",
-        "worried": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/characters/小林悠/worried.png",
         "surprised": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/characters/小林悠/surprised.png",
         "thoughtful": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/characters/小林悠/thoughtful.png"
       }
     },
-    "su_wanqing": {
-      "name": "苏晚晴",
+    "partner": {
+      "name": "小樱",
       "color": "#FFB6C1",
       "expressions": {
-        "normal": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/characters/宫本樱/normal.png",
-        "happy": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/characters/宫本樱/bright_smile.png",
-        "sad": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/characters/宫本樱/sad.png",
-        "worried": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/characters/宫本樱/worried.png"
-      }
-    },
-    "ye_lingfeng": {
-      "name": "叶凌风",
-      "color": "#9370DB",
-      "expressions": {
         "normal": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/characters/雪村千雪/normal.png",
-        "cold": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/characters/雪村千雪/cold.png",
+        "happy": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/characters/雪村千雪/soft_smile.png",
         "sad": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/characters/雪村千雪/sad.png",
-        "smile": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/characters/雪村千雪/soft_smile.png"
-      }
-    },
-    "chen_yaoyao": {
-      "name": "陈瑶瑶",
-      "color": "#333333",
-      "expressions": {
-        "normal": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/characters/桐岛凛/normal.png",
-        "serious": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/characters/桐岛凛/serious.png",
-        "tired": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/characters/桐岛凛/tired.png",
-        "smile": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/characters/桐岛凛/soft_smile.png"
+        "surprised": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/characters/雪村千雪/surprised.png"
       }
     }
   },
   "scenes": {
-    "chapter1_classroom": {
+    "intro": {
       "background": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/backgrounds/sakura_academy_classroom_day.jpg",
       "commands": [
-        { "type": "chapter_title", "text": "第一章", "subtitle": "初遇的教室" },
+        { "type": "chapter_title", "text": "引导", "subtitle": "欢迎体验" },
         { "type": "bg", "src": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/backgrounds/sakura_academy_classroom_day.jpg", "transition": "fade" },
-        { "type": "sakura", "enable": true },
-        { "type": "narration", "text": "九月的阳光透过玻璃窗洒在课桌上，空气中弥漫着新书本的墨香。林星辰站在教室门口，手里攥着转学通知单，深吸了一口气。" },
-        { "type": "show", "character": "lin_xingchen", "expression": "worried", "position": "center" },
-        { "type": "dialog", "character": "lin_xingchen", "text": "（这就是星海学园的教室吗……比想象中要宽敞许多。）", "expression": "worried" },
-        { "type": "wait", "duration": 800 },
-        { "type": "narration", "text": "一道明快的声音打断了他的思绪——" },
-        { "type": "show", "character": "su_wanqing", "expression": "happy", "position": "left" },
-        { "type": "dialog", "character": "su_wanqing", "text": "你好呀！你就是今天新来的转学生吧？我叫苏晚晴，是班长！有什么不懂的尽管问我～", "expression": "happy" },
-        { "type": "dialog", "character": "lin_xingchen", "text": "你、你好……我是林星辰，请多多关照。", "expression": "surprised" },
-        { "type": "wait", "duration": 600 },
-        { "type": "narration", "text": "就在这时，坐在窗边的一个女生缓缓合上手中的书卷，冷淡地扫了一眼这边。" },
-        { "type": "show", "character": "ye_lingfeng", "expression": "cold", "position": "right" },
-        { "type": "dialog", "character": "ye_lingfeng", "text": "……又来一个吵闹的人。", "expression": "cold" },
-        { "type": "dialog", "character": "su_wanqing", "text": "叶凌风！你每次都这样，人家会害怕的啦！", "expression": "worried" },
-        { "type": "dialog", "character": "ye_lingfeng", "text": "我只是说了事实。", "expression": "cold" },
-        { "type": "wait", "duration": 500 },
-        { "type": "narration", "text": "午休铃声响起。苏晚晴热情地提议一起去食堂，而叶凌风则默默收拾书包准备去图书馆。走廊尽头，学生会副会长陈瑶瑶抱着一叠文件匆匆走过，眉头微蹙。" },
-        { "type": "show", "character": "chen_yaoyao", "expression": "serious", "position": "center" },
-        { "type": "hide", "character": "chen_yaoyao" },
-        { "type": "set", "character": "lin_xingchen", "expression": "thoughtful" },
-        { "type": "wait", "duration": 800 },
+        { "type": "narration", "text": "欢迎来到 GalGame 运行时引擎的功能引导演示。请点击屏幕推进对话。" },
+        { "type": "show", "character": "guide", "expression": "normal", "position": "center" },
+        { "type": "dialog", "character": "guide", "text": "你好！我是向导。接下来我会带你体验引擎的核心功能。", "expression": "normal" },
+        { "type": "dialog", "character": "guide", "text": "首先，你看到的是【对话系统】——文字正在一个字一个字地出现，这就是打字机效果。", "expression": "happy" },
+        { "type": "narration", "text": "（这是一段旁白。旁白没有角色名称，用于描述场景或内心独白。）" },
+        { "type": "dialog", "character": "guide", "text": "注意对话框上方的按钮：「自动」可以自动推进，「记录」查看历史对话，「存档」保存进度，「进度」查看流程图，「菜单」打开设置。", "expression": "thoughtful" },
+        { "type": "dialog", "character": "guide", "text": "现在让我们试试【多角色同屏】和【表情切换】。", "expression": "normal" },
+        { "type": "show", "character": "partner", "expression": "normal", "position": "right" },
+        { "type": "show", "character": "guide", "expression": "happy", "position": "left" },
+        { "type": "dialog", "character": "partner", "text": "大家好！我是小樱，负责配合演示～", "expression": "happy" },
+        { "type": "dialog", "character": "guide", "text": "注意看：正在说话的角色会高亮，其他角色会稍微暗淡。", "expression": "normal" },
+        { "type": "dialog", "character": "partner", "text": "现在轮到我说话了，所以向导那边变暗了对吧？", "expression": "normal" },
+        { "type": "narration", "text": "接下来将进入【选择分支】功能测试。你的选择将决定后续剧情走向。" },
+        { "type": "dialog", "character": "guide", "text": "请在下面的选项中做出你的选择——只有点击选项才能继续，点击其他地方不会跳过。", "expression": "thoughtful" },
         {
           "type": "choice",
           "options": [
-            { "text": "和苏晚晴去食堂", "jump": "chapter2_cafeteria", "set": { "affection_wanqing": "+2", "empathy": "+1" } },
-            { "text": "跟叶凌风去图书馆", "jump": "chapter2_library", "set": { "affection_lingfeng": "+2", "empathy": "+1" } },
-            { "text": "追上陈瑶瑶帮忙", "jump": "chapter2_rooftop", "set": { "affection_yaoyao": "+2", "empathy": "+1" } }
+            { "text": "去图书馆看看", "jump": "library_scene", "set": { "route": "library" } },
+            { "text": "去天台吹风", "jump": "rooftop_scene", "set": { "route": "rooftop" } }
           ]
         }
       ]
     },
-    "chapter2_cafeteria": {
-      "background": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/backgrounds/sakura_academy_cafeteria_day.jpg",
-      "commands": [
-        { "type": "chapter_title", "text": "第二章", "subtitle": "食堂的秘密" },
-        { "type": "bg", "src": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/backgrounds/sakura_academy_cafeteria_day.jpg", "transition": "fade" },
-        { "type": "show", "character": "lin_xingchen", "expression": "normal", "position": "left" },
-        { "type": "show", "character": "su_wanqing", "expression": "happy", "position": "right" },
-        { "type": "dialog", "character": "su_wanqing", "text": "今天的特制咖喱饭超好吃的！你一定要试试！", "expression": "happy" },
-        { "type": "dialog", "character": "lin_xingchen", "text": "谢谢推荐，看起来确实很不错。", "expression": "normal" },
-        { "type": "wait", "duration": 600 },
-        { "type": "narration", "text": "吃到一半的时候，苏晚晴突然安静了下来，手里的筷子不自觉地停住了。" },
-        { "type": "show", "character": "su_wanqing", "expression": "sad", "position": "right" },
-        { "type": "dialog", "character": "lin_xingchen", "text": "晚晴……你还好吗？", "expression": "worried" },
-        { "type": "shake", "duration": 300, "intensity": 2 },
-        { "type": "dialog", "character": "su_wanqing", "text": "没事啦……只是想到家里的事情。爸爸妈妈最近经常吵架，每天晚上回到家都是冷冰冰的气氛。我总是在学校装作很开心的样子，但其实……有点累了。", "expression": "sad" },
-        { "type": "wait", "duration": 1200 },
-        {
-          "type": "choice",
-          "options": [
-            { "text": "「我会一直陪着你，我们一起面对」", "set": { "empathy": "+2", "affection_wanqing": "+4" }, "jump": "chapter3_festival" },
-            { "text": "「别担心，一切都会好起来的」", "set": { "affection_wanqing": "+2" }, "jump": "chapter3_festival" }
-          ]
-        }
-      ]
-    },
-    "chapter2_library": {
+    "library_scene": {
       "background": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/backgrounds/sakura_academy_library_window_nook_day.jpg",
       "commands": [
-        { "type": "chapter_title", "text": "第二章", "subtitle": "图书馆的告白" },
+        { "type": "chapter_title", "text": "第二章", "subtitle": "图书馆路线" },
         { "type": "bg", "src": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/backgrounds/sakura_academy_library_window_nook_day.jpg", "transition": "fade" },
-        { "type": "show", "character": "ye_lingfeng", "expression": "cold", "position": "center" },
-        { "type": "show", "character": "lin_xingchen", "expression": "normal", "position": "left" },
-        { "type": "dialog", "character": "ye_lingfeng", "text": "你怎么跟来了？图书馆是安静的地方，不要打扰别人。", "expression": "cold" },
-        { "type": "dialog", "character": "lin_xingchen", "text": "我也想看看书而已。你在看什么呢？", "expression": "normal" },
-        { "type": "dialog", "character": "ye_lingfeng", "text": "……《星与海之间》。一个关于孤独旅人寻找归宿的故事。", "expression": "normal" },
-        { "type": "wait", "duration": 800 },
-        { "type": "narration", "text": "叶凌风翻着书页的手指微微颤抖，眼眸中闪过一丝不易察觉的悲伤。" },
-        { "type": "show", "character": "ye_lingfeng", "expression": "sad", "position": "center" },
-        { "type": "dialog", "character": "ye_lingfeng", "text": "……去年，我最好的朋友背叛了我。她把我写的小说署上自己的名字发到了网上，还告诉所有人是我抄袭她的。从那以后我就再也不相信任何人了。", "expression": "sad" },
-        { "type": "wait", "duration": 1500 },
-        {
-          "type": "choice",
-          "options": [
-            { "text": "「我不会离开你，我们一起面对过去」", "set": { "empathy": "+2", "affection_lingfeng": "+4" }, "jump": "chapter3_festival" },
-            { "text": "「时间会治愈一切的」", "set": { "affection_lingfeng": "+2" }, "jump": "chapter3_festival" }
-          ]
-        }
+        { "type": "hide", "character": "partner" },
+        { "type": "show", "character": "guide", "expression": "happy", "position": "center" },
+        { "type": "dialog", "character": "guide", "text": "你选择了图书馆路线！背景已经切换了，注意淡入过渡效果。", "expression": "happy" },
+        { "type": "effect", "name": "sakura", "enable": true },
+        { "type": "dialog", "character": "guide", "text": "现在开启了【樱花粒子特效】，画面上会飘落樱花花瓣。", "expression": "normal" },
+        { "type": "shake", "duration": 500, "intensity": 3 },
+        { "type": "dialog", "character": "guide", "text": "刚才那是【画面震动】效果，用于表现惊讶或冲击的场景。", "expression": "surprised" },
+        { "type": "narration", "text": "现在建议你试试以下功能：\n1. 点击「存档」保存当前进度\n2. 点击「记录」查看之前的对话历史\n3. 点击「进度」查看流程图" },
+        { "type": "dialog", "character": "guide", "text": "测试完毕后，继续点击推进到结局。", "expression": "thoughtful" },
+        { "type": "jump", "target": "ending_good" }
       ]
     },
-    "chapter2_rooftop": {
+    "rooftop_scene": {
       "background": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/backgrounds/sakura_academy_rooftop_terrace_evening.jpg",
       "commands": [
-        { "type": "chapter_title", "text": "第二章", "subtitle": "天台的重担" },
+        { "type": "chapter_title", "text": "第二章", "subtitle": "天台路线" },
         { "type": "bg", "src": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/backgrounds/sakura_academy_rooftop_terrace_evening.jpg", "transition": "fade" },
-        { "type": "show", "character": "chen_yaoyao", "expression": "tired", "position": "right" },
-        { "type": "show", "character": "lin_xingchen", "expression": "worried", "position": "left" },
-        { "type": "dialog", "character": "lin_xingchen", "text": "陈学姐！需要帮忙搬这些文件吗？看起来好重……", "expression": "worried" },
-        { "type": "dialog", "character": "chen_yaoyao", "text": "不用了，我自己能行。", "expression": "serious" },
-        { "type": "wait", "duration": 500 },
-        { "type": "narration", "text": "但她的脚步明显有些踉跄，几份文件差点从臂弯中滑落。林星辰上前接住了即将掉落的文件夹。" },
-        { "type": "dialog", "character": "chen_yaoyao", "text": "……谢谢。其实我弟弟最近住院了，家里的经济压力很大。学生会的工作又不能丢下……我已经好几天没怎么睡觉了。", "expression": "tired" },
-        { "type": "shake", "duration": 400, "intensity": 3 },
-        { "type": "wait", "duration": 1200 },
-        {
-          "type": "choice",
-          "options": [
-            { "text": "「让我来分担你的重担吧」", "set": { "empathy": "+2", "affection_yaoyao": "+4" }, "jump": "chapter3_festival" },
-            { "text": "「你已经很努力了，不用勉强自己」", "set": { "affection_yaoyao": "+2" }, "jump": "chapter3_festival" }
-          ]
-        }
+        { "type": "hide", "character": "guide" },
+        { "type": "show", "character": "partner", "expression": "happy", "position": "center" },
+        { "type": "dialog", "character": "partner", "text": "你选了天台路线！这里的背景是傍晚的天台。", "expression": "happy" },
+        { "type": "wait", "duration": 800 },
+        { "type": "dialog", "character": "partner", "text": "刚才有一小段等待停顿，那是【wait 指令】在起作用。", "expression": "normal" },
+        { "type": "flash", "color": "#ffffff", "duration": 400 },
+        { "type": "dialog", "character": "partner", "text": "看到闪白了吗？那是【闪屏特效】，常用于回忆或转场。", "expression": "surprised" },
+        { "type": "narration", "text": "建议你现在试试：\n1. 点击「存档」保存进度\n2. 点击「记录」查看对话历史\n3. 点击「进度」查看当前解锁的章节" },
+        { "type": "dialog", "character": "partner", "text": "好了，让我们前往结局吧！", "expression": "happy" },
+        { "type": "jump", "target": "ending_good" }
       ]
     },
-    "chapter3_festival": {
+    "ending_good": {
       "background": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/backgrounds/sakura_academy_festival_venue_evening.jpg",
       "commands": [
-        { "type": "chapter_title", "text": "第三章", "subtitle": "学园祭的黄昏" },
+        { "type": "chapter_title", "text": "终章", "subtitle": "功能测试完成" },
         { "type": "bg", "src": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/backgrounds/sakura_academy_festival_venue_evening.jpg", "transition": "fade" },
-        { "type": "sakura", "enable": true },
-        { "type": "narration", "text": "学园祭的傍晚，灯笼在微风中轻轻摇曳，空气中弥漫着烤玉米和棉花糖的香甜气味。舞台上传来轻快的音乐，同学们三三两两地穿梭在各个摊位之间。" },
-        { "type": "show", "character": "su_wanqing", "expression": "worried", "position": "left" },
-        { "type": "dialog", "character": "su_wanqing", "text": "糟了！红豆馅用完了，还有一大排人在等我们的鲷鱼烧呢……", "expression": "worried" },
-        { "type": "wait", "duration": 600 },
-        { "type": "show", "character": "ye_lingfeng", "expression": "sad", "position": "right" },
-        { "type": "narration", "text": "叶凌风独自守着文学社的书展摊位，几个旧日的同学正在嘲笑她选的书。她的手指紧紧攥着书脊，指节泛白。" },
-        { "type": "wait", "duration": 600 },
-        { "type": "show", "character": "chen_yaoyao", "expression": "tired", "position": "center" },
-        { "type": "dialog", "character": "chen_yaoyao", "text": "小翔，再忍一下……医务室就在前面。姐姐的药应该带了才对……", "expression": "tired" },
-        { "type": "narration", "text": "陈瑶瑶背着发烧的弟弟，脚步沉重地穿过人群。三个方向，三份牵挂，林星辰必须做出选择。" },
-        { "type": "wait", "duration": 800 },
-        {
-          "type": "choice",
-          "options": [
-            { "text": "立刻去帮苏晚晴解围", "set": { "empathy": "+3" }, "jump": "ending_seaside" },
-            { "text": "先完成自己的事再说", "jump": "ending_cliff" },
-            { "text": "冲过去替叶凌风挡住那些人", "set": { "empathy": "+3" }, "jump": "ending_seaside" },
-            { "text": "等那些人走了再去安慰她", "jump": "ending_cliff" },
-            { "text": "跑去帮陈瑶瑶背弟弟去医务室", "set": { "empathy": "+3" }, "jump": "ending_seaside" },
-            { "text": "忙完手头的工作再去找她", "jump": "ending_cliff" }
-          ]
-        }
-      ]
-    },
-    "ending_seaside": {
-      "background": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/backgrounds/sakura_academy_cafeteria_day.jpg",
-      "commands": [
-        { "type": "chapter_title", "text": "终章", "subtitle": "海边的约定" },
-        { "type": "bg", "src": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/backgrounds/sakura_academy_rooftop_terrace_evening.jpg", "transition": "fade" },
-        { "type": "sakura", "enable": true },
-        { "type": "narration", "text": "夕阳将天空染成了一片温柔的橙红色，海浪轻轻拍打着礁石。放学后，林星辰独自来到了海边的小路上，等待着那个约定好的人。" },
-        { "type": "wait", "duration": 1500 },
-        {
-          "type": "if",
-          "condition": "affection_wanqing > affection_lingfeng and affection_wanqing > affection_yaoyao",
-          "then": [
-            { "type": "show", "character": "su_wanqing", "expression": "happy", "position": "center" },
-            { "type": "dialog", "character": "su_wanqing", "text": "星辰……谢谢你一直陪在我身边。因为有你，我终于有勇气面对家里的一切了。", "expression": "happy" },
-            { "type": "dialog", "character": "lin_xingchen", "text": "晚晴，从今以后不管遇到什么事，我都会在你身边。", "expression": "happy" },
-            { "type": "set", "variable": "affection_wanqing", "value": "+4" }
-          ],
-          "else": {
-            "type": "if",
-            "condition": "affection_lingfeng > affection_wanqing and affection_lingfeng > affection_yaoyao",
-            "then": [
-              { "type": "show", "character": "ye_lingfeng", "expression": "smile", "position": "center" },
-              { "type": "dialog", "character": "ye_lingfeng", "text": "……我给你带了这本书。扉页上写了一些话，是我一直想对你说的。", "expression": "smile" },
-              { "type": "dialog", "character": "lin_xingchen", "text": "凌风，谢谢你愿意打开心扉。从今以后，让我成为你的归宿。", "expression": "thoughtful" },
-              { "type": "set", "variable": "affection_lingfeng", "value": "+4" }
-            ],
-            "else": [
-              { "type": "show", "character": "chen_yaoyao", "expression": "smile", "position": "center" },
-              { "type": "dialog", "character": "chen_yaoyao", "text": "你总是在我最脆弱的时候出现……我不知道该怎么感谢你才好。", "expression": "smile" },
-              { "type": "dialog", "character": "lin_xingchen", "text": "瑶瑶学姐，你不需要独自承担一切。让我和你一起扛下去。", "expression": "normal" },
-              { "type": "set", "variable": "affection_yaoyao", "value": "+4" }
-            ]
-          }
-        },
-        { "type": "wait", "duration": 2000 },
-        { "type": "narration", "text": "夕阳缓缓沉入海平面，天边最后一缕金光洒在两人身上。海风轻抚着他们的发丝，带走了所有的不安和忧愁。在这一刻，整个世界仿佛都安静了下来，只剩下海浪声和彼此的心跳。" },
-        { "type": "wait", "duration": 1500 },
-        { "type": "end", "ending_id": "good_ending" }
-      ]
-    },
-    "ending_cliff": {
-      "background": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/backgrounds/sakura_academy_rooftop_terrace_evening.jpg",
-      "commands": [
-        { "type": "chapter_title", "text": "终章", "subtitle": "独自的黄昏" },
-        { "type": "bg", "src": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/backgrounds/sakura_academy_rooftop_terrace_evening.jpg", "transition": "fade" },
-        { "type": "narration", "text": "学园祭结束后的天台，只剩林星辰一个人站在护栏旁。远处的海面倒映着晚霞，美得不真实。" },
-        { "type": "show", "character": "lin_xingchen", "expression": "thoughtful", "position": "center" },
-        { "type": "wait", "duration": 1000 },
-        { "type": "narration", "text": "他回想起今天发生的一切——三个女孩各自的困境，自己犹豫不决的选择。也许在最关键的时刻，他没能伸出那双手。" },
-        { "type": "dialog", "character": "lin_xingchen", "text": "（下一次……我一定不会再犹豫了。）", "expression": "thoughtful" },
-        { "type": "wait", "duration": 1500 },
-        { "type": "narration", "text": "海风拂过面颊，带着一丝咸涩。夕阳最后的余晖消失在天际线上，天色渐渐暗了下来。这不是结局，而是新的开始——只要还有明天，就还有改变命运的机会。" },
-        { "type": "wait", "duration": 2000 },
-        { "type": "end", "ending_id": "normal_ending" }
+        { "type": "show", "character": "guide", "expression": "happy", "position": "left" },
+        { "type": "show", "character": "partner", "expression": "happy", "position": "right" },
+        { "type": "dialog", "character": "guide", "text": "恭喜你完成了所有功能的体验！", "expression": "happy" },
+        { "type": "dialog", "character": "partner", "text": "回到标题画面后，可以在「结局列表」中看到已达成的结局哦～", "expression": "happy" },
+        { "type": "narration", "text": "引导演示到此结束。感谢体验！" },
+        { "type": "end", "ending_id": "complete" }
       ]
     }
   },
   "variables": {
-    "affection_wanqing": 0,
-    "affection_lingfeng": 0,
-    "affection_yaoyao": 0,
-    "empathy": 0
+    "route": ""
   },
   "endings": {
-    "good_ending": {
-      "name": "海边的约定 —— 治愈结局",
-      "condition": "empathy >= 4"
-    },
-    "good_ending_wanqing": {
-      "name": "樱花色的未来 —— 苏晚晴线",
-      "condition": "affection_wanqing >= 8 and empathy >= 5"
-    },
-    "good_ending_lingfeng": {
-      "name": "书页间的温柔 —— 叶凌风线",
-      "condition": "affection_lingfeng >= 8 and empathy >= 5"
-    },
-    "good_ending_yaoyao": {
-      "name": "星空下的誓言 —— 陈瑶瑶线",
-      "condition": "affection_yaoyao >= 8 and empathy >= 5"
-    },
-    "normal_ending": {
-      "name": "独自的黄昏 —— 普通结局",
-      "condition": "empathy < 4"
+    "complete": {
+      "name": "引导完成 —— 全功能体验",
+      "condition": "true"
     }
   },
-  "start_scene": "chapter1_classroom",
+  "start_scene": "intro",
   "scene_order": [
-    "chapter1_classroom",
-    "chapter2_cafeteria",
-    "chapter2_library",
-    "chapter2_rooftop",
-    "chapter3_festival",
-    "ending_seaside",
-    "ending_cliff"
+    "intro",
+    "library_scene",
+    "rooftop_scene",
+    "ending_good"
   ]
 }
