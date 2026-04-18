@@ -153,15 +153,6 @@ export const useGameStore = create<GameState>((set, get) => {
     return scene.commands[index];
   };
 
-  const resolveExpression = (charKey: string, expr: string): string => {
-    const data = get().gameData;
-    if (!data) return "";
-    const charDef = data.characters[charKey];
-    if (!charDef) return "";
-    // Try exact, then "normal" fallback
-    return charDef.expressions[expr] || charDef.expressions["normal"] || Object.values(charDef.expressions)[0] || "";
-  };
-
   const executeCommand = (cmd: Command) => {
     const state = get();
     const data = state.gameData;

@@ -1,3 +1,5 @@
+import type { GameData } from "./types";
+
 /** Image preloader — prefetches all game images and caches them in memory. */
 
 const imageCache = new Map<string, HTMLImageElement>();
@@ -32,11 +34,7 @@ export function isImageCached(url: string): boolean {
 }
 
 /** Collect all image URLs from GameData for preloading */
-export function collectImageUrls(gameData: {
-  scenes: Record<string, { background?: string; commands: Array<Record<string, unknown>> }>;
-  characters: Record<string, { expressions: Record<string, string> }>;
-  _asset_manifest?: Record<string, string>;
-}): string[] {
+export function collectImageUrls(gameData: GameData): string[] {
   const urls: string[] = [];
   const manifest = gameData._asset_manifest || {};
 
@@ -62,7 +60,10 @@ export function collectImageUrls(gameData: {
     }
     // CG and bg commands
     for (const cmd of scene.commands) {
-      if ((cmd.type === "bg" || cmd.type === "cg") && typeof cmd.src === "string") {
+      if (cmd.type === "bg") {
+        const url = resolve(cmd.src);
+        if (url) urls.push(url);
+      } else if (cmd.type === "cg") {
         const url = resolve(cmd.src);
         if (url) urls.push(url);
       }

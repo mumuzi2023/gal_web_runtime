@@ -19,8 +19,8 @@ export default function DialogBox() {
 
   const [displayedText, setDisplayedText] = useState("");
   const [typingComplete, setTypingComplete] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setInterval>>();
-  const autoTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setInterval>>(undefined);
+  const autoTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const charIndexRef = useRef(0);
 
   // Typewriter effect
