@@ -188,3 +188,7 @@ interface GameData {
 ## License
 
 MIT
+
+## 版本
+
+当前版本：**v0.0.1** — 核心播放引擎功能完整，可独立运行。
