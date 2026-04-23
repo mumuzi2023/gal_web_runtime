@@ -78,6 +78,7 @@ export interface GameState {
   flashColor: string;
   effectType: string | null;
   cgSrc: string | null;
+  seSrc: string | null;
 
   // Backlog
   backlog: BacklogEntry[];
@@ -169,26 +170,37 @@ export const useGameStore = create<GameState>((set, get) => {
       case "show": {
         const chars = [...state.visibleCharacters];
         const existing = chars.findIndex((c) => c.key === cmd.character);
+        const position = cmd.position ?? (existing >= 0 ? chars[existing].position : "center");
+        const isNew = existing < 0;
         const vc: VisibleCharacter = {
           key: cmd.character,
-          expression: cmd.expression || "normal",
-          position: cmd.position || "center",
-          entering: true,
+          expression: cmd.expression || (existing >= 0 ? chars[existing].expression : "normal"),
+          position,
+          entering: isNew,
         };
-        if (existing >= 0) {
-          chars[existing] = { ...chars[existing], expression: vc.expression, position: vc.position };
+        const easyMode = (data.config?.mode ?? "easy") === "easy";
+        if (easyMode) {
+          // Enforce one-at-a-time: only the shown character remains visible
+          set({ visibleCharacters: [vc] });
         } else {
-          chars.push(vc);
+          // Advanced: update in place or append, keep others visible
+          const newChars = [...chars];
+          if (existing >= 0) {
+            newChars[existing] = { ...newChars[existing], expression: vc.expression, position: vc.position };
+          } else {
+            newChars.push(vc);
+          }
+          set({ visibleCharacters: newChars });
         }
-        set({ visibleCharacters: chars });
-        // Clear entering flag after animation
-        setTimeout(() => {
-          set((s) => ({
-            visibleCharacters: s.visibleCharacters.map((c) =>
-              c.key === cmd.character ? { ...c, entering: false } : c
-            ),
-          }));
-        }, 500);
+        if (isNew) {
+          setTimeout(() => {
+            set((s) => ({
+              visibleCharacters: s.visibleCharacters.map((c) =>
+                c.key === cmd.character ? { ...c, entering: false } : c
+              ),
+            }));
+          }, 500);
+        }
         get().advanceCommand();
         break;
       }
@@ -203,11 +215,33 @@ export const useGameStore = create<GameState>((set, get) => {
 
       case "dialog": {
         const charDef = data.characters[cmd.character];
-        // Update expression if character visible
-        set((s) => ({
-          visibleCharacters: s.visibleCharacters.map((c) =>
+        const easyMode = (data.config?.mode ?? "easy") === "easy";
+        const isVisible = state.visibleCharacters.some((c) => c.key === cmd.character);
+        let newVisibleChars: VisibleCharacter[];
+        if (easyMode && !isVisible) {
+          // Auto-show speaker at center (hide others), in case script omitted the show command
+          const autoVc: VisibleCharacter = {
+            key: cmd.character,
+            expression: cmd.expression || "normal",
+            position: "center",
+            entering: true,
+          };
+          newVisibleChars = [autoVc];
+          setTimeout(() => {
+            set((s) => ({
+              visibleCharacters: s.visibleCharacters.map((c) =>
+                c.key === cmd.character ? { ...c, entering: false } : c
+              ),
+            }));
+          }, 500);
+        } else {
+          // Update expression of speaking character, keep others in place
+          newVisibleChars = state.visibleCharacters.map((c) =>
             c.key === cmd.character ? { ...c, expression: cmd.expression || c.expression } : c
-          ),
+          );
+        }
+        set({
+          visibleCharacters: newVisibleChars,
           currentText: cmd.text,
           currentCharacter: charDef?.name || cmd.character,
           currentCharacterColor: charDef?.color || null,
@@ -215,7 +249,7 @@ export const useGameStore = create<GameState>((set, get) => {
           isTyping: true,
           waitingForClick: false,
           waitingForChoice: false,
-        }));
+        });
         // Add to backlog
         set((s) => ({
           backlog: [
@@ -270,7 +304,7 @@ export const useGameStore = create<GameState>((set, get) => {
       }
 
       case "se": {
-        // SE handled by AudioManager component
+        set({ seSrc: resolveUrl(cmd.src, data._asset_manifest) });
         get().advanceCommand();
         break;
       }
@@ -442,6 +476,7 @@ export const useGameStore = create<GameState>((set, get) => {
     flashColor: "#fff",
     effectType: null,
     cgSrc: null,
+    seSrc: null,
 
     // Backlog
     backlog: [],

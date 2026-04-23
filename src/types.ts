@@ -20,6 +20,8 @@ export interface GameMeta {
 }
 
 export interface GameConfig {
+  /** "easy" (default): runtime auto-manages show/hide. "advanced": script controls all show/hide manually. */
+  mode?: "easy" | "advanced";
   ui: {
     textbox?: { style?: string; opacity?: number };
     nameplate?: { style?: string; position?: string };

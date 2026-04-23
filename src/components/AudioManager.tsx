@@ -4,6 +4,7 @@ import { useGameStore } from "../store";
 export default function AudioManager() {
   const bgmSrc = useGameStore((s) => s.bgmSrc);
   const currentVoice = useGameStore((s) => s.currentVoice);
+  const seSrc = useGameStore((s) => s.seSrc);
   const settings = useGameStore((s) => s.settings);
   const screen = useGameStore((s) => s.screen);
 
@@ -90,6 +91,18 @@ export default function AudioManager() {
       voiceRef.current.volume = settings.voiceVolume * settings.masterVolume;
     }
   }, [settings.voiceVolume, settings.masterVolume]);
+
+  // SE playback — fires on every new seSrc value
+  useEffect(() => {
+    if (!seSrc) return;
+    const audio = new Audio(seSrc);
+    audio.volume = settings.seVolume * settings.masterVolume;
+    audio.play().catch(() => {});
+    return () => {
+      audio.pause();
+      audio.src = "";
+    };
+  }, [seSrc]);
 
   return null; // This component only manages audio, no visual output
 }

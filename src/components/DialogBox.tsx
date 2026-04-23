@@ -16,6 +16,10 @@ export default function DialogBox() {
   const toggleAutoMode = useGameStore((s) => s.toggleAutoMode);
   const setScreen = useGameStore((s) => s.setScreen);
   const cgSrc = useGameStore((s) => s.cgSrc);
+  const gameData = useGameStore((s) => s.gameData);
+
+  // Read textbox opacity from game config (default 0.82)
+  const textboxOpacity = gameData?.config?.ui?.textbox?.opacity ?? 0.82;
 
   const [displayedText, setDisplayedText] = useState("");
   const [typingComplete, setTypingComplete] = useState(false);
@@ -85,7 +89,7 @@ export default function DialogBox() {
       <div className="absolute bottom-0 left-0 right-0 px-4 pb-4">
         <div
           className="relative mx-auto max-w-4xl rounded-t-lg border border-dialog-border backdrop-blur-sm"
-          style={{ backgroundColor: "rgba(0, 0, 0, 0.82)" }}
+          style={{ backgroundColor: `rgba(0, 0, 0, ${textboxOpacity})` }}
         >
           {/* Character name plate */}
           {currentCharacter && (
