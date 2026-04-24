@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useGameStore } from "../store";
+import {
+  buttonStyle,
+  buttonHoverStyle,
+  defaultMenuButton,
+  textboxStyle,
+  nameplateStyle,
+} from "../uiConfig";
+import type { UiButtonStyle } from "../types";
 
 export default function DialogBox() {
   const currentText = useGameStore((s) => s.currentText);
@@ -18,8 +26,10 @@ export default function DialogBox() {
   const cgSrc = useGameStore((s) => s.cgSrc);
   const gameData = useGameStore((s) => s.gameData);
 
-  // Read textbox opacity from game config (default 0.82)
-  const textboxOpacity = gameData?.config?.ui?.textbox?.opacity ?? 0.82;
+  const ui = gameData?.config?.ui;
+  const textboxCss = textboxStyle(ui?.textbox);
+  const nameplateCss = nameplateStyle(ui?.nameplate, currentCharacterColor);
+  const menuOverrides = ui?.menuButtonOverrides || {};
 
   const [displayedText, setDisplayedText] = useState("");
   const [typingComplete, setTypingComplete] = useState(false);
@@ -51,26 +61,21 @@ export default function DialogBox() {
     return () => clearInterval(timerRef.current);
   }, [currentText, isTyping, textSpeed, finishTyping]);
 
-  // Auto mode - advance after typing complete
+  // Auto mode
   useEffect(() => {
     if (autoMode && waitingForClick && typingComplete) {
-      autoTimerRef.current = setTimeout(() => {
-        advanceCommand();
-      }, autoSpeed * 1000);
+      autoTimerRef.current = setTimeout(() => advanceCommand(), autoSpeed * 1000);
       return () => clearTimeout(autoTimerRef.current);
     }
   }, [autoMode, waitingForClick, typingComplete, autoSpeed, advanceCommand]);
 
   const handleClick = useCallback(() => {
-    // Dismiss CG first
     if (cgSrc) {
       useGameStore.setState({ cgSrc: null });
       useGameStore.getState().advanceCommand();
       return;
     }
-
     if (isTyping) {
-      // Skip typewriter — show full text instantly
       clearInterval(timerRef.current);
       setDisplayedText(currentText);
       setTypingComplete(true);
@@ -80,96 +85,91 @@ export default function DialogBox() {
     }
   }, [isTyping, waitingForClick, currentText, finishTyping, advanceCommand, cgSrc]);
 
-  // Don't show dialog box during choices or when no text
   if (waitingForChoice || (!currentText && !waitingForClick)) return null;
+
+  const menuActions: { key: string; label: string; onClick: () => void; activeOverride?: UiButtonStyle }[] = [
+    {
+      key: "auto",
+      label: prefixIcon(menuOverrides.auto, "自动"),
+      onClick: toggleAutoMode,
+      activeOverride: autoMode ? { background: "rgba(59, 130, 246, 0.85)", textColor: "#fff" } : undefined,
+    },
+    { key: "backlog", label: prefixIcon(menuOverrides.backlog, "记录"), onClick: () => setScreen("backlog") },
+    { key: "save", label: prefixIcon(menuOverrides.save, "存档"), onClick: () => setScreen("save") },
+    { key: "progress", label: prefixIcon(menuOverrides.progress, "进度"), onClick: () => setScreen("progress") },
+    { key: "menu", label: prefixIcon(menuOverrides.menu, "菜单"), onClick: () => setScreen("settings") },
+  ];
 
   return (
     <div className="absolute inset-0 z-20" onClick={handleClick}>
-      {/* Dialog text box at bottom */}
       <div className="absolute bottom-0 left-0 right-0 px-4 pb-4">
-        <div
-          className="relative mx-auto max-w-4xl rounded-t-lg border border-dialog-border backdrop-blur-sm"
-          style={{ backgroundColor: `rgba(0, 0, 0, ${textboxOpacity})` }}
-        >
-          {/* Character name plate */}
+        <div className="relative mx-auto max-w-4xl backdrop-blur-sm" style={textboxCss}>
           {currentCharacter && (
-            <div
-              className="absolute -top-8 left-4 px-4 py-1 rounded-t-md text-sm font-bold"
-              style={{
-                backgroundColor: "rgba(0, 0, 0, 0.9)",
-                color: currentCharacterColor || "#fff",
-                borderTop: `2px solid ${currentCharacterColor || "#fff"}`,
-              }}
-            >
+            <div className="absolute -top-8 left-4 px-4 py-1 text-sm" style={nameplateCss}>
               {currentCharacter}
             </div>
           )}
 
-          {/* Text area */}
-          <div className="px-6 py-5 min-h-[100px] text-white/90 text-base leading-relaxed">
+          <div
+            className="px-6 py-5 min-h-[100px] text-base leading-relaxed"
+            style={{ color: ui?.textbox?.textColor || "rgba(255,255,255,0.9)" }}
+          >
             {displayedText}
             {isTyping && <span className="typewriter-cursor ml-0.5">▊</span>}
           </div>
 
-          {/* Click indicator */}
           {waitingForClick && !autoMode && (
-            <div className="absolute bottom-2 right-4 text-white/40 text-xs animate-pulse">
-              ▼
-            </div>
+            <div className="absolute bottom-2 right-4 text-white/40 text-xs animate-pulse">▼</div>
           )}
 
-          {/* Control buttons */}
           <div className="absolute -top-8 right-4 flex gap-2">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleAutoMode();
-              }}
-              className={`px-2 py-0.5 text-xs rounded ${
-                autoMode ? "bg-blue-500/80 text-white" : "bg-black/60 text-white/60"
-              } hover:bg-white/20 transition`}
-            >
-              自动
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setScreen("backlog");
-              }}
-              className="px-2 py-0.5 text-xs rounded bg-black/60 text-white/60 hover:bg-white/20 transition"
-            >
-              记录
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setScreen("save");
-              }}
-              className="px-2 py-0.5 text-xs rounded bg-black/60 text-white/60 hover:bg-white/20 transition"
-            >
-              存档
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setScreen("progress");
-              }}
-              className="px-2 py-0.5 text-xs rounded bg-black/60 text-white/60 hover:bg-white/20 transition"
-            >
-              进度
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setScreen("settings");
-              }}
-              className="px-2 py-0.5 text-xs rounded bg-black/60 text-white/60 hover:bg-white/20 transition"
-            >
-              菜单
-            </button>
+            {menuActions.map((a) => (
+              <MenuButton
+                key={a.key}
+                label={a.label}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  a.onClick();
+                }}
+                override={{ ...(menuOverrides[a.key] || {}), ...(a.activeOverride || {}) }}
+                base={ui?.menuButtons}
+              />
+            ))}
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+function prefixIcon(o: UiButtonStyle | undefined, label: string): string {
+  return o?.icon ? `${o.icon} ${label}` : label;
+}
+
+function MenuButton({
+  label,
+  onClick,
+  override,
+  base,
+}: {
+  label: string;
+  onClick: (e: React.MouseEvent) => void;
+  override?: UiButtonStyle;
+  base?: UiButtonStyle;
+}) {
+  const merged: UiButtonStyle = { ...defaultMenuButton, ...(base || {}), ...(override || {}) };
+  const normal = buttonStyle(undefined, merged);
+  const hover = buttonHoverStyle(undefined, merged);
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{ ...normal, ...(hovered ? hover : {}), fontSize: "12px" }}
+      className="transition cursor-pointer"
+    >
+      {label}
+    </button>
   );
 }

@@ -1,4 +1,5 @@
 import { useGameStore } from "../store";
+import { panelStyle, panelOverlayStyle, defaultLightPanel } from "../uiConfig";
 
 export default function SaveLoadScreen() {
   const screen = useGameStore((s) => s.screen);
@@ -12,14 +13,15 @@ export default function SaveLoadScreen() {
   if (screen !== "save" && screen !== "load") return null;
 
   const isSave = screen === "save";
+  const panelCfg = gameData?.config?.ui?.saveLoadPanel;
+  const panelCss = panelStyle(panelCfg, defaultLightPanel);
+  const overlayCss = panelOverlayStyle(panelCfg, defaultLightPanel);
 
   const handleSlotClick = (slotId: number) => {
     if (isSave) {
       saveGame(slotId);
-    } else {
-      if (saves[slotId]) {
-        loadGame(slotId);
-      }
+    } else if (saves[slotId]) {
+      loadGame(slotId);
     }
   };
 
@@ -40,27 +42,22 @@ export default function SaveLoadScreen() {
 
   return (
     <div className="absolute inset-0 z-50 flex flex-col items-center">
-      {/* Background image */}
       {background && (
         <img src={background} alt="" className="absolute inset-0 w-full h-full object-cover" />
       )}
-      <div className="absolute inset-0 bg-white/40 backdrop-blur-md" />
+      <div className="absolute inset-0" style={overlayCss} />
 
       <div className="relative w-full max-w-3xl px-6 py-8">
-        <div className="bg-white/90 rounded-xl border border-gray-200 shadow-xl p-6">
+        <div style={panelCss}>
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold text-gray-800">
-              {isSave ? "存档" : "读档"}
-            </h2>
-            <button
-              onClick={() => setScreen("game")}
-              className="text-gray-500 hover:text-gray-800 transition text-sm"
-            >
+            <h2 className="text-xl font-bold">{isSave ? "存档" : "读档"}</h2>
+            <button onClick={() => setScreen("game")} className="opacity-60 hover:opacity-100 transition text-sm">
               ✕ 关闭
             </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 max-h-[70vh] overflow-y-auto backlog-scroll">
+          {/* Use a fixed height tied to the virtual canvas — was previously 70vh which leaked the real viewport */}
+          <div className="grid grid-cols-2 gap-3 max-h-[760px] overflow-y-auto backlog-scroll">
             {saves.map((slot, i) => (
               <button
                 key={i}
@@ -72,7 +69,6 @@ export default function SaveLoadScreen() {
                 } ${!slot && !isSave ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
                 disabled={!slot && !isSave}
               >
-                {/* Thumbnail area */}
                 <div className="relative w-full h-24 bg-gray-100 overflow-hidden">
                   {slot?.background ? (
                     <>
@@ -82,7 +78,6 @@ export default function SaveLoadScreen() {
                         className="w-full h-full object-cover"
                         onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                       />
-                      {/* Mini character sprites */}
                       <div className="absolute inset-0">
                         {slot.characters.map((vc) => {
                           const spriteUrl = resolveExpression(vc.key, vc.expression);
@@ -92,9 +87,8 @@ export default function SaveLoadScreen() {
                             bottom: 0,
                             height: "90%",
                           };
-                          if (vc.position === "left") posStyle.left = "10%";
-                          else if (vc.position === "right") posStyle.right = "10%";
-                          else { posStyle.left = "50%"; posStyle.transform = "translateX(-50%)"; }
+                          if (vc.position === "right") posStyle.right = "10%";
+                          else posStyle.left = "10%";
                           return (
                             <img
                               key={vc.key}
@@ -115,31 +109,21 @@ export default function SaveLoadScreen() {
                   )}
                 </div>
 
-                {/* Info area */}
                 <div className="p-3">
                   <div className="flex justify-between items-center mb-1">
-                    <span className="text-gray-700 text-sm font-medium">
-                      存档位 {i + 1}
-                    </span>
+                    <span className="text-gray-700 text-sm font-medium">存档位 {i + 1}</span>
                     {slot && (
                       <span className="text-gray-400 text-xs">
                         {new Date(slot.timestamp).toLocaleString("zh-CN", {
-                          month: "2-digit",
-                          day: "2-digit",
-                          hour: "2-digit",
-                          minute: "2-digit",
+                          month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
                         })}
                       </span>
                     )}
                   </div>
                   {slot ? (
                     <div>
-                      <div className="text-gray-600 text-xs truncate">
-                        {slot.sceneKey}
-                      </div>
-                      <div className="text-gray-400 text-xs truncate mt-0.5">
-                        {slot.description}
-                      </div>
+                      <div className="text-gray-600 text-xs truncate">{slot.sceneKey}</div>
+                      <div className="text-gray-400 text-xs truncate mt-0.5">{slot.description}</div>
                     </div>
                   ) : (
                     <div className="text-gray-300 text-xs">— 空 —</div>

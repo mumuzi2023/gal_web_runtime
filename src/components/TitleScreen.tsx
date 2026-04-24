@@ -1,4 +1,12 @@
+import { useState } from "react";
 import { useGameStore } from "../store";
+import {
+  buttonStyle,
+  buttonHoverStyle,
+  defaultTitleButton,
+  titleLayoutClass,
+} from "../uiConfig";
+import type { UiButtonStyle } from "../types";
 
 export default function TitleScreen() {
   const gameData = useGameStore((s) => s.gameData);
@@ -10,14 +18,24 @@ export default function TitleScreen() {
 
   const hasSaves = saves.some((s) => s !== null);
   const meta = gameData.meta;
+  const titleCfg = gameData.config?.ui?.title;
+  const layoutCls = titleLayoutClass(titleCfg?.layout);
 
-  // Use the first scene's background as title background if available
   const firstScene = Object.values(gameData.scenes)[0];
   const titleBg = firstScene?.background || "";
 
+  const baseBtn: UiButtonStyle | undefined = titleCfg?.buttons;
+  const overrides = titleCfg?.buttonOverrides || {};
+
+  const buttons: { key: string; label: string; onClick: () => void; show: boolean }[] = [
+    { key: "newGame", label: "新游戏", onClick: startNewGame, show: true },
+    { key: "continue", label: "继续游戏", onClick: () => setScreen("load"), show: hasSaves },
+    { key: "settings", label: "设置", onClick: () => setScreen("settings"), show: true },
+    { key: "endings", label: "结局列表", onClick: () => setScreen("endings"), show: true },
+  ];
+
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center">
-      {/* Background */}
+    <div className={`absolute inset-0 flex flex-col ${layoutCls}`}>
       {titleBg && (
         <img
           src={titleBg}
@@ -30,30 +48,38 @@ export default function TitleScreen() {
       )}
       <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-black/70" />
 
-      {/* Title content */}
       <div className="relative z-10 text-center mb-12">
-        <h1 className="text-5xl font-bold text-white tracking-widest drop-shadow-lg mb-4">
+        <h1
+          className="text-5xl font-bold tracking-widest drop-shadow-lg mb-4"
+          style={{ color: titleCfg?.titleColor || "#fff" }}
+        >
           {meta.title}
         </h1>
         {meta.description && (
-          <p className="text-white/60 text-sm max-w-md mx-auto leading-relaxed line-clamp-3">
+          <p
+            className="text-sm max-w-md mx-auto leading-relaxed line-clamp-3"
+            style={{ color: titleCfg?.subtitleColor || "rgba(255,255,255,0.6)" }}
+          >
             {meta.description.slice(0, 120)}
             {meta.description.length > 120 ? "..." : ""}
           </p>
         )}
       </div>
 
-      {/* Menu buttons */}
-      <div className="relative z-10 flex flex-col gap-3 w-64">
-        <MenuButton onClick={startNewGame}>新游戏</MenuButton>
-        {hasSaves && (
-          <MenuButton onClick={() => setScreen("load")}>继续游戏</MenuButton>
-        )}
-        <MenuButton onClick={() => setScreen("settings")}>设置</MenuButton>
-        <MenuButton onClick={() => setScreen("endings")}>结局列表</MenuButton>
+      <div className="relative z-10 flex flex-col gap-3">
+        {buttons
+          .filter((b) => b.show)
+          .map((b) => (
+            <MenuButton
+              key={b.key}
+              label={b.label}
+              onClick={b.onClick}
+              override={overrides[b.key]}
+              base={baseBtn}
+            />
+          ))}
       </div>
 
-      {/* Version */}
       <div className="absolute bottom-4 right-4 text-white/30 text-xs">
         v{meta.version} | {meta.author}
       </div>
@@ -62,21 +88,30 @@ export default function TitleScreen() {
 }
 
 function MenuButton({
+  label,
   onClick,
-  children,
+  override,
+  base,
 }: {
+  label: string;
   onClick: () => void;
-  children: React.ReactNode;
+  override?: UiButtonStyle;
+  base?: UiButtonStyle;
 }) {
+  const merged: UiButtonStyle = { ...defaultTitleButton, ...(base || {}), ...(override || {}) };
+  const normal = buttonStyle(undefined, merged);
+  const hover = buttonHoverStyle(undefined, merged);
+  const [hovered, setHovered] = useState(false);
+  const labelText = merged.icon ? `${merged.icon}  ${label}` : label;
   return (
     <button
       onClick={onClick}
-      className="py-3 px-6 text-white/90 text-lg tracking-wider rounded-md
-        bg-white/10 border border-white/20 backdrop-blur-sm
-        hover:bg-white/20 hover:border-white/40 hover:scale-105
-        transition-all duration-300 cursor-pointer"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{ ...normal, ...(hovered ? hover : {}) }}
+      className="text-lg tracking-wider backdrop-blur-sm transition-all duration-300 cursor-pointer"
     >
-      {children}
+      {labelText}
     </button>
   );
 }

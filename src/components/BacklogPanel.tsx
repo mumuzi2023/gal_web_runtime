@@ -1,5 +1,6 @@
 import { useRef, useEffect } from "react";
 import { useGameStore } from "../store";
+import { panelOverlayStyle, defaultLightPanel } from "../uiConfig";
 
 export default function BacklogPanel() {
   const screen = useGameStore((s) => s.screen);
@@ -15,6 +16,9 @@ export default function BacklogPanel() {
 
   if (screen !== "backlog") return null;
 
+  const panelCfg = gameData?.config?.ui?.backlogPanel;
+  const overlayCss = panelOverlayStyle(panelCfg, defaultLightPanel);
+
   const resolveAvatar = (charKey: string | undefined): string => {
     if (!charKey || !gameData) return "";
     const charDef = gameData.characters[charKey];
@@ -29,22 +33,19 @@ export default function BacklogPanel() {
     return manifest?.[raw] || raw;
   };
 
-  // Determine if we need a separator between entries
   const needsSeparator = (i: number): boolean => {
     if (i === 0) return false;
     const prev = backlog[i - 1];
     const curr = backlog[i];
-    // Different character, or one is narration
     return prev.character !== curr.character || !prev.character || !curr.character;
   };
 
   return (
     <div className="absolute inset-0 z-50 flex flex-col">
-      {/* Background image */}
       {background && (
         <img src={background} alt="" className="absolute inset-0 w-full h-full object-cover" />
       )}
-      <div className="absolute inset-0 bg-white/40 backdrop-blur-md" />
+      <div className="absolute inset-0" style={overlayCss} />
 
       <div className="relative flex flex-col h-full">
         <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200">
@@ -70,7 +71,6 @@ export default function BacklogPanel() {
                     </div>
                   )}
                   <div className="flex items-start gap-3 py-1.5">
-                    {/* Avatar */}
                     {entry.character ? (
                       <div className="flex-shrink-0 w-10 h-10 rounded-full overflow-hidden border-2 border-gray-200 bg-gray-100">
                         {resolveAvatar(entry.character) ? (
@@ -92,7 +92,6 @@ export default function BacklogPanel() {
                       </div>
                     )}
 
-                    {/* Text content */}
                     <div className="flex-1 text-sm min-w-0">
                       {entry.characterName ? (
                         <>

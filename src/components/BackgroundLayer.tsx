@@ -1,11 +1,9 @@
 import { useGameStore } from "../store";
 
+// Characters are restricted to two anchors. Everything else collapses to "left".
 const positionMap: Record<string, string> = {
-  left: "left-[10%]",
-  center: "left-1/2 -translate-x-1/2",
-  right: "right-[10%]",
-  "far-left": "left-[2%]",
-  "far-right": "right-[2%]",
+  left: "left-[8%]",
+  right: "right-[8%]",
 };
 
 export default function BackgroundLayer() {
@@ -18,6 +16,7 @@ export default function BackgroundLayer() {
   const flashColor = useGameStore((s) => s.flashColor);
   const effectType = useGameStore((s) => s.effectType);
   const cgSrc = useGameStore((s) => s.cgSrc);
+  const cgMode = useGameStore((s) => s.cgMode);
 
   const resolveExpression = (charKey: string, expr: string): string => {
     if (!gameData) return "";
@@ -62,19 +61,20 @@ export default function BackgroundLayer() {
       {/* Effect particles */}
       {effectType && <EffectParticles type={effectType} />}
 
-      {/* Character sprites */}
+      {/* Character sprites — left or right only, leaves the centre clear for CG */}
       <div className="absolute inset-0">
         {visibleCharacters.map((vc) => {
           const spriteUrl = resolveExpression(vc.key, vc.expression);
-          const pos = positionMap[vc.position] || positionMap.center;
+          const side = vc.position === "right" ? "right" : "left";
+          const pos = positionMap[side];
           const isSpeaking = vc.key === speakingKey;
 
           return (
             <div
               key={vc.key}
-              className={`absolute bottom-0 ${pos} h-[85%] transition-all duration-300
+              className={`absolute bottom-[12%] ${pos} h-[78%] transition-all duration-300 origin-bottom
                 ${vc.entering ? "character-enter" : ""}
-                ${!isSpeaking && speakingKey ? "brightness-75 opacity-80" : "brightness-100 opacity-100"}
+                ${!isSpeaking && speakingKey ? "brightness-50 opacity-70 scale-95" : "brightness-110 opacity-100 scale-100"}
               `}
             >
               {spriteUrl && (
@@ -93,9 +93,19 @@ export default function BackgroundLayer() {
       </div>
 
       {/* CG overlay */}
-      {cgSrc && (
+      {cgSrc && cgMode === "full" && (
         <div className="absolute inset-0 z-30 bg-black flex items-center justify-center">
           <img src={cgSrc} alt="" className="max-w-full max-h-full object-contain" />
+        </div>
+      )}
+      {cgSrc && cgMode === "half" && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
+          <div className="absolute inset-0 bg-black/40" />
+          <img
+            src={cgSrc}
+            alt=""
+            className="relative max-w-[60%] max-h-[70%] object-contain rounded-md shadow-[0_20px_60px_rgba(0,0,0,0.6)] ring-1 ring-white/20"
+          />
         </div>
       )}
 

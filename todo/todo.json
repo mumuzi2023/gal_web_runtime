@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "gal_web_runtime",
-    "updated_at": "2026-04-18T13:00:00Z",
+    "updated_at": "2026-04-24T00:00:00Z",
     "owner": "copilot"
   },
   "items": [
@@ -84,6 +84,36 @@
       "acceptance": "选择分支时只有点击选项才能推进，点击其他地方不会跳过",
       "notes": "advanceCommand 添加 waitingForChoice 守卫",
       "last_updated": "2026-04-18T14:00:00Z"
+    },
+    {
+      "id": "T009",
+      "title": "修复 SaveLoadScreen 的 vh 泄漏",
+      "status": "done",
+      "priority": "P0",
+      "depends_on": [],
+      "acceptance": "存档面板高度按 1920×1080 虚拟画布固定，不再随真实视口变化",
+      "notes": "max-h-[70vh] → 固定 px 约束",
+      "last_updated": "2026-04-24T00:00:00Z"
+    },
+    {
+      "id": "T010",
+      "title": "角色立绘仅左右两侧 + 全屏/半屏 CG",
+      "status": "done",
+      "priority": "P0",
+      "depends_on": [],
+      "acceptance": "show/dialog 自动归一化 position 为 left/right；CG 命令支持 mode: full|half；半屏 CG 居中显示且角色仍可见；说话者高亮稍明显",
+      "notes": "BackgroundLayer + store 调整；CgCommand 增加 mode 字段",
+      "last_updated": "2026-04-24T00:00:00Z"
+    },
+    {
+      "id": "T011",
+      "title": "扩展 GameConfig.ui 配置 schema",
+      "status": "done",
+      "priority": "P1",
+      "depends_on": [],
+      "acceptance": "JSON 可配置：标题按钮/菜单按钮/对话框/名牌/设置/存档/记录面板的背景图、颜色、边框、圆角、阴影；config.ui.title.layout 控制标题按钮位置",
+      "notes": "新增 src/uiConfig.ts 提供默认样式和合并函数；各组件改为读取 gameData.config.ui",
+      "last_updated": "2026-04-24T00:00:00Z"
     }
   ]
 }

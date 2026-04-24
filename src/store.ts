@@ -78,6 +78,7 @@ export interface GameState {
   flashColor: string;
   effectType: string | null;
   cgSrc: string | null;
+  cgMode: "full" | "half";
   seSrc: string | null;
 
   // Backlog
@@ -170,7 +171,9 @@ export const useGameStore = create<GameState>((set, get) => {
       case "show": {
         const chars = [...state.visibleCharacters];
         const existing = chars.findIndex((c) => c.key === cmd.character);
-        const position = cmd.position ?? (existing >= 0 ? chars[existing].position : "center");
+        const rawPos = cmd.position ?? (existing >= 0 ? chars[existing].position : "left");
+        // Characters are restricted to left/right; everything else collapses to a side.
+        const position = rawPos === "right" || rawPos === "far-right" ? "right" : "left";
         const isNew = existing < 0;
         const vc: VisibleCharacter = {
           key: cmd.character,
@@ -219,11 +222,11 @@ export const useGameStore = create<GameState>((set, get) => {
         const isVisible = state.visibleCharacters.some((c) => c.key === cmd.character);
         let newVisibleChars: VisibleCharacter[];
         if (easyMode && !isVisible) {
-          // Auto-show speaker at center (hide others), in case script omitted the show command
+          // Auto-show speaker on the left (hide others), in case script omitted the show command
           const autoVc: VisibleCharacter = {
             key: cmd.character,
             expression: cmd.expression || "normal",
-            position: "center",
+            position: "left",
             entering: true,
           };
           newVisibleChars = [autoVc];
@@ -384,7 +387,10 @@ export const useGameStore = create<GameState>((set, get) => {
       }
 
       case "cg": {
-        set({ cgSrc: resolveUrl(cmd.src, data._asset_manifest) });
+        set({
+          cgSrc: resolveUrl(cmd.src, data._asset_manifest),
+          cgMode: cmd.mode === "half" ? "half" : "full",
+        });
         // CG stays until click
         break;
       }
@@ -476,6 +482,7 @@ export const useGameStore = create<GameState>((set, get) => {
     flashColor: "#fff",
     effectType: null,
     cgSrc: null,
+    cgMode: "full",
     seSrc: null,
 
     // Backlog

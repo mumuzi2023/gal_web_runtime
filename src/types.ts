@@ -22,10 +22,96 @@ export interface GameMeta {
 export interface GameConfig {
   /** "easy" (default): runtime auto-manages show/hide. "advanced": script controls all show/hide manually. */
   mode?: "easy" | "advanced";
-  ui: {
-    textbox?: { style?: string; opacity?: number };
-    nameplate?: { style?: string; position?: string };
-  };
+  ui?: UiConfig;
+}
+
+/* ── UI customization (all fields optional, fall back to defaults) ── */
+
+export interface UiButtonStyle {
+  background?: string;            // CSS color (rgba/hex)
+  backgroundImage?: string;       // url(...) or full url to image
+  borderColor?: string;
+  borderWidth?: string;           // e.g. "1px"
+  borderRadius?: string;          // e.g. "8px" / "9999px"
+  textColor?: string;
+  hoverBackground?: string;
+  hoverTextColor?: string;
+  hoverBorderColor?: string;
+  fontFamily?: string;
+  fontWeight?: string | number;
+  padding?: string;
+  shadow?: string;                // CSS box-shadow value
+  width?: string;
+  /** Optional small icon shown to the left of the label (url or emoji). */
+  icon?: string;
+}
+
+export interface UiPanelStyle {
+  background?: string;            // background color of the panel surface
+  backgroundImage?: string;       // url string
+  borderColor?: string;
+  borderWidth?: string;
+  borderRadius?: string;
+  textColor?: string;
+  shadow?: string;
+  /** CSS backdrop-filter blur length, e.g. "8px". */
+  backdropBlur?: string;
+  /** Color overlay drawn on top of the page-level background image. */
+  overlay?: string;
+  padding?: string;
+}
+
+export interface UiTextboxStyle {
+  /** Legacy field, no effect now. */
+  style?: string;
+  /** Legacy alpha (0-1) for the dialog background. */
+  opacity?: number;
+  background?: string;            // overrides opacity-based background
+  backgroundImage?: string;
+  borderColor?: string;
+  borderRadius?: string;
+  textColor?: string;
+  fontFamily?: string;
+  fontSize?: string;
+  shadow?: string;
+}
+
+export interface UiNameplateStyle {
+  style?: string;                 // legacy
+  position?: string;              // legacy ("top-left" etc.)
+  background?: string;
+  borderColor?: string;
+  borderWidth?: string;
+  borderRadius?: string;
+  /** When set, overrides the per-character color. */
+  textColor?: string;
+  fontFamily?: string;
+  fontWeight?: string | number;
+}
+
+export interface UiTitleConfig {
+  /** Where to place the menu button stack. */
+  layout?: "center" | "left" | "right" | "bottom-center";
+  titleColor?: string;
+  subtitleColor?: string;
+  buttons?: UiButtonStyle;
+  /** Per-button override keyed by action: newGame|continue|settings|endings */
+  buttonOverrides?: Record<string, UiButtonStyle>;
+}
+
+export interface UiConfig {
+  textbox?: UiTextboxStyle;
+  nameplate?: UiNameplateStyle;
+  title?: UiTitleConfig;
+  /** Style for the small auto/log/save/progress/menu buttons above the dialog. */
+  menuButtons?: UiButtonStyle;
+  /** Per-button override keyed by action: auto|backlog|save|progress|menu */
+  menuButtonOverrides?: Record<string, UiButtonStyle>;
+  settingsPanel?: UiPanelStyle;
+  saveLoadPanel?: UiPanelStyle;
+  backlogPanel?: UiPanelStyle;
+  /** Optional inline style for choice buttons. */
+  choiceButtons?: UiButtonStyle;
 }
 
 export interface CharacterDef {
@@ -179,6 +265,8 @@ export interface CgCommand extends BaseCommand {
   type: "cg";
   src: string;
   transition?: string;
+  /** "full" (default) covers entire viewport; "half" centers the image and keeps background/characters visible. */
+  mode?: "full" | "half";
 }
 
 export interface ChapterTitleCommand extends BaseCommand {

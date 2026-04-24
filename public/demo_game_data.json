@@ -7,8 +7,47 @@
   },
   "config": {
     "ui": {
-      "textbox": { "style": "bottom", "opacity": 0.85 },
-      "nameplate": { "style": "default", "position": "top-left" }
+      "textbox": { "opacity": 0.85 },
+      "nameplate": { "background": "rgba(20, 20, 40, 0.92)", "borderRadius": "6px 6px 0 0" },
+      "title": {
+        "layout": "center",
+        "titleColor": "#fff",
+        "buttons": {
+          "background": "rgba(30, 30, 60, 0.55)",
+          "borderColor": "rgba(180, 200, 255, 0.45)",
+          "borderRadius": "9999px",
+          "textColor": "#fff",
+          "hoverBackground": "rgba(80, 80, 160, 0.75)"
+        },
+        "buttonOverrides": {
+          "newGame": { "icon": "▶" },
+          "continue": { "icon": "⟳" },
+          "settings": { "icon": "⚙" },
+          "endings": { "icon": "★" }
+        }
+      },
+      "menuButtons": {
+        "background": "rgba(0, 0, 0, 0.55)",
+        "textColor": "rgba(255, 255, 255, 0.85)",
+        "borderRadius": "9999px",
+        "padding": "4px 10px"
+      },
+      "menuButtonOverrides": {
+        "auto": { "icon": "▶" },
+        "backlog": { "icon": "📜" },
+        "save": { "icon": "💾" },
+        "progress": { "icon": "🗺" },
+        "menu": { "icon": "☰" }
+      },
+      "settingsPanel": { "borderRadius": "16px", "overlay": "rgba(20, 20, 40, 0.55)" },
+      "saveLoadPanel": { "borderRadius": "16px", "overlay": "rgba(20, 20, 40, 0.55)" },
+      "backlogPanel": { "overlay": "rgba(20, 20, 40, 0.55)" },
+      "choiceButtons": {
+        "background": "rgba(20, 20, 40, 0.92)",
+        "borderColor": "rgba(255, 255, 255, 0.25)",
+        "borderRadius": "9999px",
+        "hoverBorderColor": "rgba(180, 200, 255, 0.85)"
+      }
     }
   },
   "characters": {
@@ -40,11 +79,11 @@
         { "type": "chapter_title", "text": "引导", "subtitle": "欢迎体验" },
         { "type": "bg", "src": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/backgrounds/sakura_academy_classroom_day.jpg", "transition": "fade" },
         { "type": "narration", "text": "欢迎来到 GalGame 运行时引擎的功能引导演示。请点击屏幕推进对话。" },
-        { "type": "show", "character": "guide", "expression": "normal", "position": "center" },
+        { "type": "show", "character": "guide", "expression": "normal", "position": "left" },
         { "type": "dialog", "character": "guide", "text": "你好！我是向导。接下来我会带你体验引擎的核心功能。", "expression": "normal" },
         { "type": "dialog", "character": "guide", "text": "首先，你看到的是【对话系统】——文字正在一个字一个字地出现，这就是打字机效果。", "expression": "happy" },
         { "type": "narration", "text": "（这是一段旁白。旁白没有角色名称，用于描述场景或内心独白。）" },
-        { "type": "dialog", "character": "guide", "text": "注意对话框上方的按钮：「自动」可以自动推进，「记录」查看历史对话，「存档」保存进度，「进度」查看流程图，「菜单」打开设置。", "expression": "thoughtful" },
+        { "type": "dialog", "character": "guide", "text": "注意对话框上方的按钮：「自动」「记录」「存档」「进度」「菜单」。", "expression": "thoughtful" },
         { "type": "dialog", "character": "guide", "text": "现在让我们试试【多角色同屏】和【表情切换】。", "expression": "normal" },
         { "type": "show", "character": "partner", "expression": "normal", "position": "right" },
         { "type": "show", "character": "guide", "expression": "happy", "position": "left" },
@@ -68,13 +107,15 @@
         { "type": "chapter_title", "text": "第二章", "subtitle": "图书馆路线" },
         { "type": "bg", "src": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/backgrounds/sakura_academy_library_window_nook_day.jpg", "transition": "fade" },
         { "type": "hide", "character": "partner" },
-        { "type": "show", "character": "guide", "expression": "happy", "position": "center" },
+        { "type": "show", "character": "guide", "expression": "happy", "position": "left" },
         { "type": "dialog", "character": "guide", "text": "你选择了图书馆路线！背景已经切换了，注意淡入过渡效果。", "expression": "happy" },
         { "type": "effect", "name": "sakura", "enable": true },
         { "type": "dialog", "character": "guide", "text": "现在开启了【樱花粒子特效】，画面上会飘落樱花花瓣。", "expression": "normal" },
+        { "type": "cg", "src": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/backgrounds/sakura_academy_library_window_nook_day.jpg", "mode": "half" },
+        { "type": "dialog", "character": "guide", "text": "这是一张【半屏 CG】——它居中显示，但角色和背景仍然可见。点击屏幕收起。", "expression": "thoughtful" },
         { "type": "shake", "duration": 500, "intensity": 3 },
         { "type": "dialog", "character": "guide", "text": "刚才那是【画面震动】效果，用于表现惊讶或冲击的场景。", "expression": "surprised" },
-        { "type": "narration", "text": "现在建议你试试以下功能：\n1. 点击「存档」保存当前进度\n2. 点击「记录」查看之前的对话历史\n3. 点击「进度」查看流程图" },
+        { "type": "narration", "text": "现在建议你试试：\n1. 点击「存档」保存当前进度\n2. 点击「记录」查看之前的对话历史\n3. 点击「进度」查看流程图" },
         { "type": "dialog", "character": "guide", "text": "测试完毕后，继续点击推进到结局。", "expression": "thoughtful" },
         { "type": "jump", "target": "ending_good" }
       ]
@@ -85,7 +126,7 @@
         { "type": "chapter_title", "text": "第二章", "subtitle": "天台路线" },
         { "type": "bg", "src": "https://storyforge.r2.it-bill.com/projects/019d8c1c-e4cb-77f1-8133-9fc8ff971812/backgrounds/sakura_academy_rooftop_terrace_evening.jpg", "transition": "fade" },
         { "type": "hide", "character": "guide" },
-        { "type": "show", "character": "partner", "expression": "happy", "position": "center" },
+        { "type": "show", "character": "partner", "expression": "happy", "position": "right" },
         { "type": "dialog", "character": "partner", "text": "你选了天台路线！这里的背景是傍晚的天台。", "expression": "happy" },
         { "type": "wait", "duration": 800 },
         { "type": "dialog", "character": "partner", "text": "刚才有一小段等待停顿，那是【wait 指令】在起作用。", "expression": "normal" },
