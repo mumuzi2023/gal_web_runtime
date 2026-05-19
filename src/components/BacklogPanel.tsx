@@ -1,5 +1,5 @@
 import { useRef, useEffect } from "react";
-import { useGameStore } from "../store";
+import { useGameStore, resolveOverlayBackground } from "../store";
 import { panelOverlayStyle, defaultLightPanel } from "../uiConfig";
 
 export default function BacklogPanel() {
@@ -18,6 +18,7 @@ export default function BacklogPanel() {
 
   const panelCfg = gameData?.config?.ui?.backlogPanel;
   const overlayCss = panelOverlayStyle(panelCfg, defaultLightPanel);
+  const bgUrl = resolveOverlayBackground(background, gameData);
 
   const resolveAvatar = (charKey: string | undefined): string => {
     if (!charKey || !gameData) return "";
@@ -42,8 +43,8 @@ export default function BacklogPanel() {
 
   return (
     <div className="absolute inset-0 z-50 flex flex-col">
-      {background && (
-        <img src={background} alt="" className="absolute inset-0 w-full h-full object-cover" />
+      {bgUrl && (
+        <img src={bgUrl} alt="" className="absolute inset-0 w-full h-full object-cover" onError={(e)=>{(e.target as HTMLImageElement).style.display='none';}} />
       )}
       <div className="absolute inset-0" style={overlayCss} />
 

@@ -26,6 +26,22 @@ function resolveUrl(path: string | undefined, manifest: Record<string, string> |
   return path;
 }
 
+/** Pick a usable background URL, falling back to the first scene's bg
+ * (used by overlay panels opened before the player has entered any scene). */
+export function resolveOverlayBackground(
+  current: string | undefined,
+  data: GameData | null | undefined,
+): string {
+  if (current && current.startsWith("http")) return current;
+  if (!data) return current || "";
+  for (const sk of data.scene_order || Object.keys(data.scenes || {})) {
+    const sceneBg = data.scenes?.[sk]?.background;
+    const url = resolveUrl(sceneBg, data._asset_manifest);
+    if (url && url.startsWith("http")) return url;
+  }
+  return current || "";
+}
+
 export interface GameSettings {
   textSpeed: number;       // chars per second (10-100)
   autoSpeed: number;       // seconds per message in auto mode (1-10)
@@ -387,8 +403,16 @@ export const useGameStore = create<GameState>((set, get) => {
       }
 
       case "cg": {
+        const resolved = resolveUrl(cmd.src, data._asset_manifest);
+        // Skip CG when the asset is missing — otherwise we'd show a black overlay
+        // with a broken-image inside, which players experience as "the screen
+        // suddenly went black mid-click".
+        if (!resolved || !resolved.startsWith("http")) {
+          get().advanceCommand();
+          break;
+        }
         set({
-          cgSrc: resolveUrl(cmd.src, data._asset_manifest),
+          cgSrc: resolved,
           cgMode: cmd.mode === "half" ? "half" : "full",
         });
         // CG stays until click
@@ -509,6 +533,46 @@ export const useGameStore = create<GameState>((set, get) => {
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data: GameData = await res.json();
+        // Normalize loosely-typed fields so optional/missing values do not crash.
+        const anyData = data as unknown as Record<string, unknown>;
+        if (anyData.variables == null || typeof anyData.variables !== "object" || Array.isArray(anyData.variables)) {
+          // Accept either {name,default}[] or {var:value} dict; coerce to dict
+          if (Array.isArray(anyData.variables)) {
+            const dict: Record<string, unknown> = {};
+            for (const v of anyData.variables as Array<Record<string, unknown>>) {
+              const key = String(v?.name ?? v?.key ?? "");
+              if (key) dict[key] = v?.default ?? 0;
+            }
+            anyData.variables = dict;
+          } else {
+            anyData.variables = {};
+          }
+        }
+        if (Array.isArray(anyData.endings)) {
+          const dict: Record<string, unknown> = {};
+          for (const e of anyData.endings as Array<Record<string, unknown>>) {
+            const key = String(e?.key ?? e?.id ?? "");
+            if (key) dict[key] = e;
+          }
+          anyData.endings = dict;
+        } else if (anyData.endings == null || typeof anyData.endings !== "object") {
+          anyData.endings = {};
+        }
+        if (anyData.characters == null || typeof anyData.characters !== "object" || Array.isArray(anyData.characters)) {
+          if (Array.isArray(anyData.characters)) {
+            const dict: Record<string, unknown> = {};
+            for (const c of anyData.characters as Array<Record<string, unknown>>) {
+              const key = String(c?.name_key ?? c?.key ?? c?.name ?? "");
+              if (key) dict[key] = c;
+            }
+            anyData.characters = dict;
+          } else {
+            anyData.characters = {};
+          }
+        }
+        if (anyData.scenes == null || typeof anyData.scenes !== "object" || Array.isArray(anyData.scenes)) {
+          anyData.scenes = {};
+        }
         set({ gameData: data, loading: false });
         // Preload all images in background
         const imageUrls = collectImageUrls(data);
@@ -633,24 +697,46 @@ export const useGameStore = create<GameState>((set, get) => {
 
     jumpToScene: (sceneKey: string) => {
       const data = get().gameData;
-      if (!data || !data.scenes[sceneKey]) {
-        // Scene not found — try next scene in scene_order, or go to title
-        if (data?.scene_order) {
-          const curIdx = data.scene_order.indexOf(get().currentSceneKey);
-          if (curIdx >= 0 && curIdx + 1 < data.scene_order.length) {
-            const nextKey = data.scene_order[curIdx + 1];
-            if (data.scenes[nextKey]) {
-              get().jumpToScene(nextKey);
-              return;
-            }
-          }
-        }
+      let resolvedKey = sceneKey;
+      if (!data) {
         set({ screen: "title" });
         return;
       }
-      const sceneDef = data.scenes[sceneKey];
+      if (!data.scenes[sceneKey]) {
+        // Fuzzy match: scripts sometimes reference "scene_name" but the actual
+        // packaged scene is "scene_name__variant". Try prefix / contains match
+        // before giving up. This avoids "mid-game suddenly returns to title".
+        const allKeys = Object.keys(data.scenes);
+        const lower = sceneKey.toLowerCase();
+        const cand =
+          allKeys.find((k) => k.toLowerCase() === lower) ||
+          allKeys.find((k) => k.toLowerCase().startsWith(lower + "__")) ||
+          allKeys.find((k) => k.toLowerCase().startsWith(lower + "_")) ||
+          allKeys.find((k) => k.toLowerCase().startsWith(lower)) ||
+          allKeys.find((k) => k.toLowerCase().includes(lower));
+        if (cand) {
+          console.warn(`[runtime] jump target "${sceneKey}" not found; falling back to "${cand}"`);
+          resolvedKey = cand;
+        } else {
+          // Try scene_order
+          if (data.scene_order) {
+            const curIdx = data.scene_order.indexOf(get().currentSceneKey);
+            if (curIdx >= 0 && curIdx + 1 < data.scene_order.length) {
+              const nextKey = data.scene_order[curIdx + 1];
+              if (data.scenes[nextKey]) {
+                get().jumpToScene(nextKey);
+                return;
+              }
+            }
+          }
+          console.error(`[runtime] jump target "${sceneKey}" not found and no fallback`);
+          set({ screen: "title" });
+          return;
+        }
+      }
+      const sceneDef = data.scenes[resolvedKey];
       set({
-        currentSceneKey: sceneKey,
+        currentSceneKey: resolvedKey,
         commandIndex: 0,
         visibleCharacters: [],
         background: resolveUrl(sceneDef.background, data._asset_manifest) || get().background,

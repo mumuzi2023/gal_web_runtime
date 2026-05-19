@@ -1,4 +1,4 @@
-import { useGameStore } from "../store";
+import { useGameStore, resolveOverlayBackground } from "../store";
 import { panelStyle, panelOverlayStyle, defaultLightPanel } from "../uiConfig";
 
 export default function SettingsPanel() {
@@ -11,14 +11,16 @@ export default function SettingsPanel() {
 
   if (screen !== "settings") return null;
 
+  const bgUrl = resolveOverlayBackground(background, gameData);
+
   const panelCfg = gameData?.config?.ui?.settingsPanel;
   const panelCss = panelStyle(panelCfg, defaultLightPanel);
   const overlayCss = panelOverlayStyle(panelCfg, defaultLightPanel);
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center">
-      {background && (
-        <img src={background} alt="" className="absolute inset-0 w-full h-full object-cover" />
+      {bgUrl && (
+        <img src={bgUrl} alt="" className="absolute inset-0 w-full h-full object-cover" onError={(e)=>{(e.target as HTMLImageElement).style.display='none';}} />
       )}
       <div className="absolute inset-0" style={overlayCss} />
 

@@ -95,7 +95,16 @@ export default function BackgroundLayer() {
       {/* CG overlay */}
       {cgSrc && cgMode === "full" && (
         <div className="absolute inset-0 z-30 bg-black flex items-center justify-center">
-          <img src={cgSrc} alt="" className="max-w-full max-h-full object-contain" />
+          <img
+            src={cgSrc}
+            alt=""
+            className="max-w-full max-h-full object-contain"
+            onError={() => {
+              // Asset failed to load — clear CG so the underlying scene shows
+              // through instead of leaving the player on a black screen.
+              useGameStore.setState({ cgSrc: null });
+            }}
+          />
         </div>
       )}
       {cgSrc && cgMode === "half" && (
@@ -105,6 +114,9 @@ export default function BackgroundLayer() {
             src={cgSrc}
             alt=""
             className="relative max-w-[60%] max-h-[70%] object-contain rounded-md shadow-[0_20px_60px_rgba(0,0,0,0.6)] ring-1 ring-white/20"
+            onError={() => {
+              useGameStore.setState({ cgSrc: null });
+            }}
           />
         </div>
       )}

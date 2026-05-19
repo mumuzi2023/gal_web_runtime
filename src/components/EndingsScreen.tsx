@@ -1,4 +1,4 @@
-import { useGameStore } from "../store";
+import { useGameStore, resolveOverlayBackground } from "../store";
 
 export default function EndingsScreen() {
   const screen = useGameStore((s) => s.screen);
@@ -10,12 +10,13 @@ export default function EndingsScreen() {
   if (screen !== "endings" || !gameData) return null;
 
   const allEndings = Object.entries(gameData.endings);
+  const bgUrl = resolveOverlayBackground(background, gameData);
 
   return (
     <div className="absolute inset-0 z-50 flex flex-col items-center">
       {/* Background image */}
-      {background && (
-        <img src={background} alt="" className="absolute inset-0 w-full h-full object-cover" />
+      {bgUrl && (
+        <img src={bgUrl} alt="" className="absolute inset-0 w-full h-full object-cover" onError={(e)=>{(e.target as HTMLImageElement).style.display='none';}} />
       )}
       <div className="absolute inset-0 bg-white/40 backdrop-blur-md" />
 

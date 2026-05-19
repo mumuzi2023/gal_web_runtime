@@ -7,7 +7,7 @@ import type {
   UiTitleConfig,
 } from "./types";
 
-/* ── Defaults — match the previous hard-coded look ── */
+/* ── Defaults (match runtime hard-coded look) ── */
 
 export const defaultMenuButton: UiButtonStyle = {
   background: "rgba(0, 0, 0, 0.6)",
@@ -35,7 +35,8 @@ export const defaultLightPanel: UiPanelStyle = {
   borderWidth: "1px",
   borderRadius: "12px",
   textColor: "rgba(31, 41, 55, 1)",
-  shadow: "0 20px 25px -5px rgba(0, 0, 0, 0.10), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+  shadow:
+    "0 20px 25px -5px rgba(0, 0, 0, 0.10), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
   backdropBlur: "12px",
   overlay: "rgba(255, 255, 255, 0.40)",
   padding: "24px",
@@ -66,12 +67,17 @@ export const defaultChoiceButton: UiButtonStyle = {
 
 /* ── Style builders ── */
 
-function bgValue(style: { background?: string; backgroundImage?: string }): string | undefined {
+function bgValue(style: {
+  background?: string;
+  backgroundImage?: string;
+}): string | undefined {
   if (style.backgroundImage) {
     const url = /^url\(/i.test(style.backgroundImage)
       ? style.backgroundImage
       : `url("${style.backgroundImage}")`;
-    return style.background ? `${style.background} ${url} center/cover no-repeat` : `${url} center/cover no-repeat`;
+    return style.background
+      ? `${style.background} ${url} center/cover no-repeat`
+      : `${url} center/cover no-repeat`;
   }
   return style.background;
 }
@@ -97,7 +103,6 @@ export function buttonStyle(
   return css;
 }
 
-/** Hover style applied via inline mouseenter/leave handlers. */
 export function buttonHoverStyle(
   override: UiButtonStyle | undefined,
   fallback: UiButtonStyle,
@@ -130,7 +135,10 @@ export function panelStyle(
   return css;
 }
 
-export function panelOverlayStyle(override: UiPanelStyle | undefined, fallback: UiPanelStyle): CSSProperties {
+export function panelOverlayStyle(
+  override: UiPanelStyle | undefined,
+  fallback: UiPanelStyle,
+): CSSProperties {
   const s: UiPanelStyle = { ...fallback, ...(override || {}) };
   const css: CSSProperties = {};
   if (s.overlay) css.background = s.overlay;
@@ -138,7 +146,9 @@ export function panelOverlayStyle(override: UiPanelStyle | undefined, fallback: 
   return css;
 }
 
-export function textboxStyle(override: UiTextboxStyle | undefined): CSSProperties {
+export function textboxStyle(
+  override: UiTextboxStyle | undefined,
+): CSSProperties {
   const s: UiTextboxStyle = { ...defaultTextbox, ...(override || {}) };
   const css: CSSProperties = {};
   if (s.background || s.backgroundImage) {
@@ -168,7 +178,8 @@ export function nameplateStyle(
   };
   if (s.background) css.backgroundColor = s.background;
   else css.backgroundColor = "rgba(0, 0, 0, 0.9)";
-  if (s.borderColor && s.borderWidth) css.border = `${s.borderWidth} solid ${s.borderColor}`;
+  if (s.borderColor && s.borderWidth)
+    css.border = `${s.borderWidth} solid ${s.borderColor}`;
   if (s.borderRadius) css.borderRadius = s.borderRadius;
   if (s.fontFamily) css.fontFamily = s.fontFamily;
   if (s.fontWeight !== undefined) css.fontWeight = s.fontWeight;

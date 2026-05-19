@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from "react";
-import { useGameStore } from "../store";
+import { useGameStore, resolveOverlayBackground } from "../store";
 import type { GameData, ChoiceCommand } from "../types";
 
 /* ─── Layout constants ─── */
@@ -100,17 +100,42 @@ function buildFlowGraph(
   }
 
   /* 4 ─ place chapter nodes (centered, spread when siblings) */
+  // Build scene_key → chapter title/number map so non-chapter-title scenes
+  // can still display Chinese chapter info instead of raw English keys.
+  const sceneToChapter = new Map<string, { title: string; number?: string | number }>();
+  for (const ch of gameData.chapters || []) {
+    const title = ch.title || ch.name || ch.key;
+    for (const sk of ch.scenes || []) {
+      sceneToChapter.set(sk, { title, number: ch.number });
+    }
+  }
+  for (const ch of gameData.side_chapters || []) {
+    const title = ch.title || ch.name || ch.key;
+    for (const sk of ch.scenes || []) {
+      if (!sceneToChapter.has(sk)) sceneToChapter.set(sk, { title });
+    }
+  }
   for (const [row, scenes] of rowGroups) {
     const n = scenes.length;
     scenes.forEach((sk, i) => {
       const scene = gameData.scenes[sk];
-      let label = sk;
+      let label: string | null = null;
       for (const cmd of scene.commands) {
         if (cmd.type === "chapter_title") {
           label = (cmd as { text: string }).text;
           const sub = (cmd as { subtitle?: string }).subtitle;
           if (sub) label += "\n" + sub;
           break;
+        }
+      }
+      if (!label) {
+        const chInfo = sceneToChapter.get(sk);
+        if (chInfo) {
+          label = chInfo.number != null
+            ? `${chInfo.number} · ${chInfo.title}`
+            : chInfo.title;
+        } else {
+          label = sk;
         }
       }
       const cx = CX + (i - (n - 1) / 2) * COL_W;
@@ -459,13 +484,14 @@ export default function ProgressPanel() {
 
   return (
     <div className="absolute inset-0 z-50 flex flex-col">
-      {background && (
+      {(() => { const bgUrl = resolveOverlayBackground(background, gameData); return bgUrl ? (
         <img
-          src={background}
+          src={bgUrl}
           alt=""
           className="absolute inset-0 w-full h-full object-cover"
+          onError={(e)=>{(e.target as HTMLImageElement).style.display='none';}}
         />
-      )}
+      ) : null; })()}
       <div className="absolute inset-0 bg-white/40 backdrop-blur-md" />
 
       <div className="relative flex flex-col h-full">

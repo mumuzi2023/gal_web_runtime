@@ -1,4 +1,4 @@
-import { useGameStore } from "../store";
+import { useGameStore, resolveOverlayBackground } from "../store";
 import { panelStyle, panelOverlayStyle, defaultLightPanel } from "../uiConfig";
 
 export default function SaveLoadScreen() {
@@ -16,6 +16,7 @@ export default function SaveLoadScreen() {
   const panelCfg = gameData?.config?.ui?.saveLoadPanel;
   const panelCss = panelStyle(panelCfg, defaultLightPanel);
   const overlayCss = panelOverlayStyle(panelCfg, defaultLightPanel);
+  const bgUrl = resolveOverlayBackground(background, gameData);
 
   const handleSlotClick = (slotId: number) => {
     if (isSave) {
@@ -42,8 +43,8 @@ export default function SaveLoadScreen() {
 
   return (
     <div className="absolute inset-0 z-50 flex flex-col items-center">
-      {background && (
-        <img src={background} alt="" className="absolute inset-0 w-full h-full object-cover" />
+      {bgUrl && (
+        <img src={bgUrl} alt="" className="absolute inset-0 w-full h-full object-cover" onError={(e)=>{(e.target as HTMLImageElement).style.display='none';}} />
       )}
       <div className="absolute inset-0" style={overlayCss} />
 

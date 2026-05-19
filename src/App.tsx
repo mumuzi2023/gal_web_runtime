@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useCallback } from "react";
 import { useGameStore } from "./store";
 import TitleScreen from "./components/TitleScreen";
 import BackgroundLayer from "./components/BackgroundLayer";
@@ -12,10 +12,11 @@ import BacklogPanel from "./components/BacklogPanel";
 import EndingsScreen from "./components/EndingsScreen";
 import ProgressPanel from "./components/ProgressPanel";
 
-// Fixed internal resolution — the entire game is designed at this size
-// and scaled uniformly to fit the viewport (like an image).
-const GAME_W = 1920;
-const GAME_H = 1080;
+// Reference design dimensions. Layout is fluid (% of the viewport), but font
+// sizes scale with `min(vw/REF_W, vh/REF_H)` so text stays readable on small
+// windows without distorting layout.
+const REF_W = 1920;
+const REF_H = 1080;
 
 export default function App() {
   const loadGameData = useGameStore((s) => s.loadGameData);
@@ -24,19 +25,25 @@ export default function App() {
   const gameData = useGameStore((s) => s.gameData);
   const screen = useGameStore((s) => s.screen);
 
-  const [scale, setScale] = useState(1);
-
-  const updateScale = useCallback(() => {
+  const updateFontScale = useCallback(() => {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    setScale(Math.min(vw / GAME_W, vh / GAME_H));
+    const scale = Math.min(vw / REF_W, vh / REF_H);
+    // 16px is the default html root font-size; multiplying it scales every
+    // Tailwind text-* class (which is rem-based) and any rem/em consumer.
+    document.documentElement.style.fontSize = `${Math.max(8, 16 * scale)}px`;
   }, []);
 
   useEffect(() => {
-    updateScale();
-    window.addEventListener("resize", updateScale);
-    return () => window.removeEventListener("resize", updateScale);
-  }, [updateScale]);
+    updateFontScale();
+    window.addEventListener("resize", updateFontScale);
+    return () => {
+      window.removeEventListener("resize", updateFontScale);
+      // Restore default so the loading/error screens render normally if the
+      // component unmounts (e.g. HMR).
+      document.documentElement.style.fontSize = "";
+    };
+  }, [updateFontScale]);
 
   useEffect(() => {
     // Get game data URL from query parameter, or auto-load game_data.json
@@ -66,17 +73,7 @@ export default function App() {
 
   return (
     <div className="fixed inset-0 bg-black overflow-hidden">
-      <div
-        className="absolute overflow-hidden select-none"
-        style={{
-          width: GAME_W,
-          height: GAME_H,
-          left: "50%",
-          top: "50%",
-          transform: `translate(-50%, -50%) scale(${scale})`,
-          transformOrigin: "center center",
-        }}
-      >
+      <div className="absolute inset-0 overflow-hidden select-none">
       {/* Audio manager (invisible) */}
       <AudioManager />
 
