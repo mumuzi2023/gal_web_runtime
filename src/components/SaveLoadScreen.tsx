@@ -1,5 +1,5 @@
 import { useGameStore, resolveOverlayBackground } from "../store";
-import { panelStyle, panelOverlayStyle, defaultLightPanel } from "../uiConfig";
+import { panelOverlayStyle, defaultLightPanel } from "../uiConfig";
 
 export default function SaveLoadScreen() {
   const screen = useGameStore((s) => s.screen);
@@ -14,7 +14,6 @@ export default function SaveLoadScreen() {
 
   const isSave = screen === "save";
   const panelCfg = gameData?.config?.ui?.saveLoadPanel;
-  const panelCss = panelStyle(panelCfg, defaultLightPanel);
   const overlayCss = panelOverlayStyle(panelCfg, defaultLightPanel);
   const bgUrl = resolveOverlayBackground(background, gameData);
 
@@ -46,93 +45,94 @@ export default function SaveLoadScreen() {
       {bgUrl && (
         <img src={bgUrl} alt="" className="absolute inset-0 w-full h-full object-cover" onError={(e)=>{(e.target as HTMLImageElement).style.display='none';}} />
       )}
-      <div className="absolute inset-0" style={overlayCss} />
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" style={overlayCss} />
 
-      <div className="relative w-full max-w-3xl px-6 py-8">
-        <div style={panelCss}>
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold">{isSave ? "存档" : "读档"}</h2>
-            <button onClick={() => setScreen("game")} className="opacity-60 hover:opacity-100 transition text-sm">
-              ✕ 关闭
-            </button>
-          </div>
+      <div className="relative w-full max-w-4xl px-6 py-8 h-full flex flex-col">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-bold text-white/90">{isSave ? "存档" : "读档"}</h2>
+          <button onClick={() => setScreen("game")} className="text-white/50 hover:text-white/90 transition text-sm cursor-pointer">
+            ✕ 关闭
+          </button>
+        </div>
 
-          {/* Use a fixed height tied to the virtual canvas — was previously 70vh which leaked the real viewport */}
-          <div className="grid grid-cols-2 gap-3 max-h-[760px] overflow-y-auto backlog-scroll">
-            {saves.map((slot, i) => (
-              <button
-                key={i}
-                onClick={() => handleSlotClick(i)}
-                className={`text-left rounded-lg border transition overflow-hidden ${
-                  slot
-                    ? "border-gray-300 bg-white hover:bg-gray-50 hover:shadow-md"
-                    : "border-gray-200 bg-gray-50 hover:bg-gray-100"
-                } ${!slot && !isSave ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
-                disabled={!slot && !isSave}
-              >
-                <div className="relative w-full h-24 bg-gray-100 overflow-hidden">
-                  {slot?.background ? (
-                    <>
-                      <img
-                        src={slot.background}
-                        alt=""
-                        className="w-full h-full object-cover"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                      />
-                      <div className="absolute inset-0">
-                        {slot.characters.map((vc) => {
-                          const spriteUrl = resolveExpression(vc.key, vc.expression);
-                          if (!spriteUrl) return null;
-                          const posStyle: React.CSSProperties = {
-                            position: "absolute",
-                            bottom: 0,
-                            height: "90%",
-                          };
-                          if (vc.position === "right") posStyle.right = "10%";
-                          else posStyle.left = "10%";
-                          return (
-                            <img
-                              key={vc.key}
-                              src={spriteUrl}
-                              alt=""
-                              style={posStyle}
-                              className="object-contain"
-                              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                            />
-                          );
-                        })}
-                      </div>
-                    </>
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-300 text-2xl">
-                      {slot ? "📷" : ""}
+        {/* Grid — 2 cols mobile, 4 cols desktop */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 flex-1 overflow-y-auto backlog-scroll">
+          {saves.map((slot, i) => (
+            <button
+              key={i}
+              onClick={() => handleSlotClick(i)}
+              className={`text-left rounded-lg transition overflow-hidden flex flex-col ${
+                slot
+                  ? "bg-black/50 border border-white/15 hover:border-white/40 hover:bg-black/60"
+                  : "bg-black/30 border border-dashed border-white/10 hover:border-white/30"
+              } ${!slot && !isSave ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
+              disabled={!slot && !isSave}
+            >
+              {/* Thumbnail area */}
+              <div className="relative w-full h-20 bg-black/40 overflow-hidden">
+                {slot?.background ? (
+                  <>
+                    <img
+                      src={slot.background}
+                      alt=""
+                      className="w-full h-full object-cover opacity-80"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                    />
+                    <div className="absolute inset-0">
+                      {slot.characters.map((vc) => {
+                        const spriteUrl = resolveExpression(vc.key, vc.expression);
+                        if (!spriteUrl) return null;
+                        const posStyle: React.CSSProperties = {
+                          position: "absolute",
+                          bottom: 0,
+                          height: "90%",
+                        };
+                        if (vc.position === "right") posStyle.right = "10%";
+                        else posStyle.left = "10%";
+                        return (
+                          <img
+                            key={vc.key}
+                            src={spriteUrl}
+                            alt=""
+                            style={posStyle}
+                            className="object-contain"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                          />
+                        );
+                      })}
                     </div>
-                  )}
-                </div>
-
-                <div className="p-3">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-gray-700 text-sm font-medium">存档位 {i + 1}</span>
-                    {slot && (
-                      <span className="text-gray-400 text-xs">
-                        {new Date(slot.timestamp).toLocaleString("zh-CN", {
-                          month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
-                        })}
-                      </span>
-                    )}
+                  </>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-white/20 text-lg">
+                    {slot ? "" : ""}
                   </div>
-                  {slot ? (
-                    <div>
-                      <div className="text-gray-600 text-xs truncate">{slot.sceneKey}</div>
-                      <div className="text-gray-400 text-xs truncate mt-0.5">{slot.description}</div>
-                    </div>
-                  ) : (
-                    <div className="text-gray-300 text-xs">— 空 —</div>
+                )}
+              </div>
+
+              {/* Slot info */}
+              <div className="p-2.5 flex-1">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-white/70 text-xs font-medium">No.{i + 1}</span>
+                  {slot && (
+                    <span className="text-white/40 text-[10px]">
+                      {new Date(slot.timestamp).toLocaleString("zh-CN", {
+                        month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
+                      })}
+                    </span>
                   )}
                 </div>
-              </button>
-            ))}
-          </div>
+                {slot ? (
+                  <div>
+                    <div className="text-white/50 text-[11px] truncate">{slot.sceneKey}</div>
+                    <div className="text-white/30 text-[10px] truncate mt-0.5">{slot.description}</div>
+                  </div>
+                ) : (
+                  <div className="text-white/20 text-[11px]">— 空 —</div>
+                )}
+              </div>
+            </button>
+          ))}
         </div>
       </div>
     </div>

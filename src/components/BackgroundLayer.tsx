@@ -1,9 +1,10 @@
 import { useGameStore } from "../store";
 
-// Characters are restricted to two anchors. Everything else collapses to "left".
+// Characters support left/center/right positions.
 const positionMap: Record<string, string> = {
-  left: "left-[8%]",
-  right: "right-[8%]",
+  left: "left-[10%]",
+  center: "left-1/2 -translate-x-1/2",
+  right: "right-[10%]",
 };
 
 export default function BackgroundLayer() {
@@ -61,20 +62,20 @@ export default function BackgroundLayer() {
       {/* Effect particles */}
       {effectType && <EffectParticles type={effectType} />}
 
-      {/* Character sprites — left or right only, leaves the centre clear for CG */}
+      {/* Character sprites — left/center/right positions */}
       <div className="absolute inset-0">
         {visibleCharacters.map((vc) => {
           const spriteUrl = resolveExpression(vc.key, vc.expression);
-          const side = vc.position === "right" ? "right" : "left";
+          const side = vc.position === "right" ? "right" : vc.position === "center" ? "center" : "left";
           const pos = positionMap[side];
           const isSpeaking = vc.key === speakingKey;
 
           return (
             <div
               key={vc.key}
-              className={`absolute bottom-[12%] ${pos} h-[78%] transition-all duration-300 origin-bottom
+              className={`absolute bottom-0 ${pos} h-[82%] transition-all duration-500 ease-out origin-bottom
                 ${vc.entering ? "character-enter" : ""}
-                ${!isSpeaking && speakingKey ? "brightness-50 opacity-70 scale-95" : "brightness-110 opacity-100 scale-100"}
+                ${!isSpeaking && speakingKey ? "brightness-[0.6] opacity-70 scale-[0.98]" : "brightness-100 opacity-100 scale-[1.02]"}
               `}
             >
               {spriteUrl && (

@@ -9,7 +9,7 @@ import type {
   ChoiceOption,
 } from "./types";
 import { evaluateCondition, applySet } from "./engine";
-import { preloadImages, collectImageUrls } from "./preloader";
+import { preloadImages, collectImageUrls, preloadNextScene } from "./preloader";
 
 const SAVE_KEY = "galgame_saves";
 const SETTINGS_KEY = "galgame_settings";
@@ -188,8 +188,8 @@ export const useGameStore = create<GameState>((set, get) => {
         const chars = [...state.visibleCharacters];
         const existing = chars.findIndex((c) => c.key === cmd.character);
         const rawPos = cmd.position ?? (existing >= 0 ? chars[existing].position : "left");
-        // Characters are restricted to left/right; everything else collapses to a side.
-        const position = rawPos === "right" || rawPos === "far-right" ? "right" : "left";
+        // Support left/center/right positions
+        const position = rawPos === "right" || rawPos === "far-right" ? "right" : rawPos === "center" ? "center" : "left";
         const isNew = existing < 0;
         const vc: VisibleCharacter = {
           key: cmd.character,
@@ -743,6 +743,8 @@ export const useGameStore = create<GameState>((set, get) => {
         bgmSrc: resolveUrl(sceneDef.bgm, data._asset_manifest) || get().bgmSrc,
         currentVoice: null,
       });
+      // Preload next scene's assets in background to avoid loading flicker
+      preloadNextScene(data, resolvedKey);
       const firstCmd = sceneDef.commands[0];
       if (firstCmd) executeCommand(firstCmd);
     },

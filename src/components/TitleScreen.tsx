@@ -35,7 +35,7 @@ export default function TitleScreen() {
   ];
 
   return (
-    <div className={`absolute inset-0 flex flex-col ${layoutCls}`}>
+    <div className={`absolute inset-0 flex flex-col title-fade-in ${layoutCls}`}>
       {titleBg && (
         <img
           src={titleBg}
@@ -46,12 +46,16 @@ export default function TitleScreen() {
           }}
         />
       )}
-      <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-black/70" />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/10 to-black/60" />
 
-      <div className="relative z-10 text-center mb-12">
+      {/* Title — upper 1/3 of screen */}
+      <div className="relative z-10 text-center mt-[12vh] mb-auto">
         <h1
-          className="text-5xl font-bold tracking-widest drop-shadow-lg mb-4"
-          style={{ color: titleCfg?.titleColor || "#fff" }}
+          className="text-5xl font-bold tracking-widest mb-4"
+          style={{
+            color: titleCfg?.titleColor || "#fff",
+            textShadow: "0 2px 20px rgba(0,0,0,0.7), 0 0 40px rgba(0,0,0,0.3)",
+          }}
         >
           {meta.title}
         </h1>
@@ -66,7 +70,8 @@ export default function TitleScreen() {
         )}
       </div>
 
-      <div className="relative z-10 flex flex-col gap-3">
+      {/* Buttons — lower 1/3, vertical stack, centered */}
+      <div className="relative z-10 flex flex-col gap-3 items-center mb-[12vh]">
         {buttons
           .filter((b) => b.show)
           .map((b) => (
@@ -109,7 +114,7 @@ function MenuButton({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{ ...normal, ...(hovered ? hover : {}) }}
-      className="text-lg tracking-wider backdrop-blur-sm transition-all duration-300 cursor-pointer"
+      className="text-lg tracking-wider backdrop-blur-sm transition-all duration-300 cursor-pointer bg-black/40 border border-white/20 hover:bg-white/10 hover:border-white/40"
     >
       {labelText}
     </button>

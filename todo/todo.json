@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "gal_web_runtime",
-    "updated_at": "2026-04-24T00:00:00Z",
+    "updated_at": "2026-05-19T12:00:00Z",
     "owner": "copilot"
   },
   "items": [
@@ -114,6 +114,16 @@
       "acceptance": "JSON 可配置：标题按钮/菜单按钮/对话框/名牌/设置/存档/记录面板的背景图、颜色、边框、圆角、阴影；config.ui.title.layout 控制标题按钮位置",
       "notes": "新增 src/uiConfig.ts 提供默认样式和合并函数；各组件改为读取 gameData.config.ui",
       "last_updated": "2026-04-24T00:00:00Z"
+    },
+    {
+      "id": "T012",
+      "title": "UI大改版：标准GalGame/VN布局",
+      "status": "done",
+      "priority": "P0",
+      "depends_on": [],
+      "acceptance": "对话框底部25%高度90%宽度；名牌浮动在对话框上方；角色支持left/center/right；说话者正常亮度+scale(1.02)非说话者dimmed(0.6)+scale(0.98)；CTC弹跳指示器；选项居中+交错动画；标题屏幕fade-in；存档暗色4列网格",
+      "notes": "index.css清理重复样式并添加rain-fall/snow-fall/sakura-fall关键帧；preloader增加场景级预加载",
+      "last_updated": "2026-05-19T12:00:00Z"
     }
   ]
 }

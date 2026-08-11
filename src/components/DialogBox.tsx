@@ -102,41 +102,47 @@ export default function DialogBox() {
 
   return (
     <div className="absolute inset-0 z-20" onClick={handleClick}>
-      <div className="absolute bottom-0 left-0 right-0 px-4 pb-4">
-        <div className="relative mx-auto max-w-4xl backdrop-blur-sm" style={textboxCss}>
-          {currentCharacter && (
-            <div className="absolute -top-8 left-4 px-4 py-1 text-sm" style={nameplateCss}>
-              {currentCharacter}
-            </div>
-          )}
-
+      {/* Dialog box — bottom 25% of screen, 90% width, centered */}
+      <div className="absolute bottom-0 left-[5%] right-[5%] h-[25vh] rounded-t-xl bg-black/75 backdrop-blur-md border-t border-white/10" style={textboxCss}>
+        {/* Name plate — floating above the dialog box */}
+        {currentCharacter && (
           <div
-            className="px-6 py-5 min-h-[100px] text-base leading-relaxed"
-            style={{ color: ui?.textbox?.textColor || "rgba(255,255,255,0.9)" }}
+            className="absolute -top-10 left-6 px-5 py-1.5 rounded-t-lg text-sm font-bold"
+            style={nameplateCss}
           >
-            {displayedText}
-            {isTyping && <span className="typewriter-cursor ml-0.5">▊</span>}
+            {currentCharacter}
           </div>
+        )}
 
-          {waitingForClick && !autoMode && (
-            <div className="absolute bottom-2 right-4 text-white/40 text-xs animate-pulse">▼</div>
-          )}
-
-          <div className="absolute -top-8 right-4 flex gap-2">
-            {menuActions.map((a) => (
-              <MenuButton
-                key={a.key}
-                label={a.label}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  a.onClick();
-                }}
-                override={{ ...(menuOverrides[a.key] || {}), ...(a.activeOverride || {}) }}
-                base={ui?.menuButtons}
-              />
-            ))}
-          </div>
+        {/* Menu buttons — top-right corner of dialog box */}
+        <div className="absolute top-2 right-4 flex gap-2">
+          {menuActions.map((a) => (
+            <MenuButton
+              key={a.key}
+              label={a.label}
+              onClick={(e) => {
+                e.stopPropagation();
+                a.onClick();
+              }}
+              override={{ ...(menuOverrides[a.key] || {}), ...(a.activeOverride || {}) }}
+              base={ui?.menuButtons}
+            />
+          ))}
         </div>
+
+        {/* Text area */}
+        <div
+          className="px-8 py-6 pr-16 h-full overflow-y-auto text-[1.05rem] leading-[1.8]"
+          style={{ color: ui?.textbox?.textColor || "rgba(255,255,255,0.9)" }}
+        >
+          {displayedText}
+          {isTyping && <span className="typewriter-cursor ml-0.5 text-white/70">|</span>}
+        </div>
+
+        {/* CTC indicator — bottom-right, bouncing triangle */}
+        {waitingForClick && !autoMode && (
+          <div className="absolute bottom-3 right-4 text-white/50 text-sm ctc-bounce">&#9660;</div>
+        )}
       </div>
     </div>
   );
