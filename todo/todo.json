@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "gal_web_runtime",
-    "updated_at": "2026-05-19T12:00:00Z",
+    "updated_at": "2026-08-11T12:35:00+08:00",
     "owner": "copilot"
   },
   "items": [
@@ -124,6 +124,26 @@
       "acceptance": "对话框底部25%高度90%宽度；名牌浮动在对话框上方；角色支持left/center/right；说话者正常亮度+scale(1.02)非说话者dimmed(0.6)+scale(0.98)；CTC弹跳指示器；选项居中+交错动画；标题屏幕fade-in；存档暗色4列网格",
       "notes": "index.css清理重复样式并添加rain-fall/snow-fall/sakura-fall关键帧；preloader增加场景级预加载",
       "last_updated": "2026-05-19T12:00:00Z"
+    },
+    {
+      "id": "T013",
+      "title": "同步 Runtime README 与当前代码和验证状态",
+      "status": "done",
+      "priority": "P0",
+      "depends_on": ["T012"],
+      "acceptance": "README 准确描述当前依赖、播放器架构、18 类命令、GameData 契约漂移、构建和 lint 状态。",
+      "notes": "README 已同步 React 19.2/Vite 8/TS6、播放器组件、18 类命令、预加载、GameData chapters 漂移及当前 build/lint 失败状态；未修改生产代码。",
+      "last_updated": "2026-08-11T11:28:31+08:00"
+    },
+    {
+      "id": "T014",
+      "title": "同步 Generator 章节契约并恢复 Runtime 构建",
+      "status": "done",
+      "priority": "P0",
+      "depends_on": ["T013"],
+      "acceptance": "GameData 声明 Generator 输出的 chapters/side_chapters，ProgressPanel 类型检查和生产构建通过。",
+      "notes": "新增 ChapterDef/SideChapterDef 并接入 GameData；npm run build 通过。npm run lint 仍有既有 Math.random purity、DialogBox setState-in-effect 和 hook dependency 问题。",
+      "last_updated": "2026-08-11T12:35:00+08:00"
     }
   ]
 }

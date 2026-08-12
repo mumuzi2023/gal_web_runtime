@@ -302,9 +302,12 @@ export const useGameStore = create<GameState>((set, get) => {
       }
 
       case "choice": {
+        const availableOptions = cmd.options.filter(
+          (option) => !option.condition || evaluateCondition(option.condition, state.variables)
+        );
         set({
           waitingForChoice: true,
-          choiceOptions: cmd.options,
+          choiceOptions: availableOptions,
           isTyping: false,
           waitingForClick: false,
         });
@@ -642,7 +645,7 @@ export const useGameStore = create<GameState>((set, get) => {
       } else {
         // Scene ended — try advancing to next scene in scene_order
         const data = state.gameData;
-        if (data?.scene_order) {
+        if (!data?.explicit_flow && data?.scene_order) {
           const curIdx = data.scene_order.indexOf(state.currentSceneKey);
           if (curIdx >= 0 && curIdx + 1 < data.scene_order.length) {
             const nextKey = data.scene_order[curIdx + 1];
@@ -703,6 +706,11 @@ export const useGameStore = create<GameState>((set, get) => {
         return;
       }
       if (!data.scenes[sceneKey]) {
+        if (data.explicit_flow) {
+          console.error(`[runtime] explicit jump target "${sceneKey}" does not exist`);
+          set({ screen: "title" });
+          return;
+        }
         // Fuzzy match: scripts sometimes reference "scene_name" but the actual
         // packaged scene is "scene_name__variant". Try prefix / contains match
         // before giving up. This avoids "mid-game suddenly returns to title".
@@ -719,7 +727,7 @@ export const useGameStore = create<GameState>((set, get) => {
           resolvedKey = cand;
         } else {
           // Try scene_order
-          if (data.scene_order) {
+          if (!data.explicit_flow && data.scene_order) {
             const curIdx = data.scene_order.indexOf(get().currentSceneKey);
             if (curIdx >= 0 && curIdx + 1 < data.scene_order.length) {
               const nextKey = data.scene_order[curIdx + 1];

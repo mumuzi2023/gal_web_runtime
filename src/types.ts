@@ -7,9 +7,44 @@ export interface GameData {
   scenes: Record<string, SceneDef>;
   variables: Record<string, string | number | boolean>;
   endings: Record<string, EndingDef>;
+  chapters?: ChapterDef[];
+  side_chapters?: SideChapterDef[];
   _asset_manifest?: Record<string, string>;
   start_scene?: string;
   scene_order?: string[];
+  /** New generated projects contain explicit jump/choice/end commands for
+   * every narrative node. Legacy projects omit this and retain linear
+   * scene_order fallback behavior. */
+  explicit_flow?: boolean;
+}
+
+export interface ChapterDef {
+  key: string;
+  number?: string | number;
+  title?: string;
+  name?: string;
+  summary?: string;
+  key_points?: string[];
+  characters?: string[];
+  parents?: string[];
+  scenes?: string[];
+  branch_points?: Array<Record<string, unknown>>;
+  kind?: "common" | "route" | "ending";
+  chapter_type?: "common" | "route" | "ending";
+  route_id?: string | null;
+  ending_id?: string | null;
+  terminal?: boolean;
+  origin?: "main" | string;
+}
+
+export interface SideChapterDef {
+  key: string;
+  title?: string;
+  name?: string;
+  summary?: string;
+  scenes?: string[];
+  insert_between?: Record<string, unknown>;
+  origin?: "side_chapter" | string;
 }
 
 export interface GameMeta {
