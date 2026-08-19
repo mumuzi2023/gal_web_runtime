@@ -153,7 +153,16 @@ export interface CharacterDef {
   name: string;
   color: string;
   expressions: Record<string, string>;
+  default_outfit?: string;
+  outfits?: Record<string, OutfitDef>;
   voice_prefix?: string;
+}
+
+export interface OutfitDef {
+  name: string;
+  expressions: Record<string, string>;
+  multiview?: string;
+  scene_keys?: string[];
 }
 
 export interface SceneDef {
@@ -197,12 +206,14 @@ export interface BgCommand extends BaseCommand {
   type: "bg";
   src: string;
   transition?: string;
+  position?: "left" | "center" | "right";
 }
 
 export interface ShowCommand extends BaseCommand {
   type: "show";
   character: string;
   expression?: string;
+  outfit_id?: string;
   position?: string;
   transition?: string;
 }
@@ -217,6 +228,7 @@ export interface DialogCommand extends BaseCommand {
   type: "dialog";
   character: string;
   expression?: string;
+  outfit_id?: string;
   text: string;
   voice?: string;
 }
@@ -264,6 +276,7 @@ export interface SetCommand extends BaseCommand {
   // Also can appear as character expression change
   character?: string;
   expression?: string;
+  outfit_id?: string;
 }
 
 export interface IfCommand extends BaseCommand {
@@ -320,6 +333,7 @@ export interface EndCommand extends BaseCommand {
 export interface VisibleCharacter {
   key: string;
   expression: string;
+  outfitId?: string;
   position: string;
   entering?: boolean;
   exiting?: boolean;
@@ -327,6 +341,7 @@ export interface VisibleCharacter {
 
 export interface BacklogEntry {
   character?: string;
+  outfitId?: string;
   characterName?: string;
   characterColor?: string;
   text: string;
@@ -341,6 +356,7 @@ export interface SaveSlot {
   variables: Record<string, number>;
   characters: VisibleCharacter[];
   background: string;
+  backgroundPosition?: "left" | "center" | "right";
   bgmSrc: string;
   title: string;
   description: string;

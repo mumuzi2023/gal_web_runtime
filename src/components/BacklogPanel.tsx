@@ -20,14 +20,16 @@ export default function BacklogPanel() {
   const overlayCss = panelOverlayStyle(panelCfg, defaultLightPanel);
   const bgUrl = resolveOverlayBackground(background, gameData);
 
-  const resolveAvatar = (charKey: string | undefined): string => {
+  const resolveAvatar = (charKey: string | undefined, outfitId?: string): string => {
     if (!charKey || !gameData) return "";
     const charDef = gameData.characters[charKey];
     if (!charDef) return "";
     const manifest = gameData._asset_manifest;
+    const outfit = charDef.outfits?.[outfitId || charDef.default_outfit || "default"];
+    const expressions = outfit?.expressions || charDef.expressions;
     const raw =
-      charDef.expressions["normal"] ||
-      Object.values(charDef.expressions)[0] ||
+      expressions["normal"] ||
+      Object.values(expressions)[0] ||
       "";
     if (!raw) return "";
     if (raw.startsWith("http")) return raw;
@@ -74,9 +76,9 @@ export default function BacklogPanel() {
                   <div className="flex items-start gap-3 py-1.5">
                     {entry.character ? (
                       <div className="flex-shrink-0 w-10 h-10 rounded-full overflow-hidden border-2 border-gray-200 bg-gray-100">
-                        {resolveAvatar(entry.character) ? (
+                        {resolveAvatar(entry.character, entry.outfitId) ? (
                           <img
-                            src={resolveAvatar(entry.character)}
+                            src={resolveAvatar(entry.character, entry.outfitId)}
                             alt={entry.characterName || ""}
                             className="w-full h-full object-cover object-top"
                             onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}

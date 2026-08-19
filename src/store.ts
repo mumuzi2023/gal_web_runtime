@@ -76,6 +76,7 @@ export interface GameState {
   variables: Record<string, number>;
   visibleCharacters: VisibleCharacter[];
   background: string;
+  backgroundPosition: "left" | "center" | "right";
   bgmSrc: string;
   currentText: string;
   currentCharacter: string | null;
@@ -179,7 +180,10 @@ export const useGameStore = create<GameState>((set, get) => {
 
     switch (cmd.type) {
       case "bg": {
-        set({ background: resolveUrl(cmd.src, data._asset_manifest) });
+        set({
+          background: resolveUrl(cmd.src, data._asset_manifest),
+          backgroundPosition: cmd.position || "center",
+        });
         get().advanceCommand();
         break;
       }
@@ -194,6 +198,7 @@ export const useGameStore = create<GameState>((set, get) => {
         const vc: VisibleCharacter = {
           key: cmd.character,
           expression: cmd.expression || (existing >= 0 ? chars[existing].expression : "normal"),
+          outfitId: cmd.outfit_id || (existing >= 0 ? chars[existing].outfitId : "default"),
           position,
           entering: isNew,
         };
@@ -205,7 +210,12 @@ export const useGameStore = create<GameState>((set, get) => {
           // Advanced: update in place or append, keep others visible
           const newChars = [...chars];
           if (existing >= 0) {
-            newChars[existing] = { ...newChars[existing], expression: vc.expression, position: vc.position };
+            newChars[existing] = {
+              ...newChars[existing],
+              expression: vc.expression,
+              outfitId: vc.outfitId,
+              position: vc.position,
+            };
           } else {
             newChars.push(vc);
           }
@@ -242,6 +252,7 @@ export const useGameStore = create<GameState>((set, get) => {
           const autoVc: VisibleCharacter = {
             key: cmd.character,
             expression: cmd.expression || "normal",
+            outfitId: cmd.outfit_id || charDef?.default_outfit || "default",
             position: "left",
             entering: true,
           };
@@ -256,7 +267,13 @@ export const useGameStore = create<GameState>((set, get) => {
         } else {
           // Update expression of speaking character, keep others in place
           newVisibleChars = state.visibleCharacters.map((c) =>
-            c.key === cmd.character ? { ...c, expression: cmd.expression || c.expression } : c
+            c.key === cmd.character
+              ? {
+                  ...c,
+                  expression: cmd.expression || c.expression,
+                  outfitId: cmd.outfit_id || c.outfitId || charDef?.default_outfit || "default",
+                }
+              : c
           );
         }
         set({
@@ -275,6 +292,7 @@ export const useGameStore = create<GameState>((set, get) => {
             ...s.backlog,
             {
               character: cmd.character,
+              outfitId: newVisibleChars.find((c) => c.key === cmd.character)?.outfitId,
               characterName: charDef?.name || cmd.character,
               characterColor: charDef?.color,
               text: cmd.text,
@@ -343,10 +361,16 @@ export const useGameStore = create<GameState>((set, get) => {
           set({ variables: vars });
         }
         // Also handle expression-change "set" commands (character + expression)
-        if (cmd.character && cmd.expression) {
+        if (cmd.character && (cmd.expression || cmd.outfit_id)) {
           set((s) => ({
             visibleCharacters: s.visibleCharacters.map((c) =>
-              c.key === cmd.character ? { ...c, expression: cmd.expression! } : c
+              c.key === cmd.character
+                ? {
+                    ...c,
+                    expression: cmd.expression || c.expression,
+                    outfitId: cmd.outfit_id || c.outfitId,
+                  }
+                : c
             ),
           }));
         }
@@ -491,6 +515,7 @@ export const useGameStore = create<GameState>((set, get) => {
     variables: {},
     visibleCharacters: [],
     background: "",
+    backgroundPosition: "center",
     bgmSrc: "",
     currentText: "",
     currentCharacter: null,
@@ -533,7 +558,12 @@ export const useGameStore = create<GameState>((set, get) => {
     loadGameData: async (url: string) => {
       set({ loading: true, error: null });
       try {
-        const res = await fetch(url);
+        const token = localStorage.getItem("token");
+        const resolvedUrl = new URL(url, window.location.href);
+        const sameOrigin = resolvedUrl.origin === window.location.origin;
+        const res = await fetch(url, {
+          headers: token && sameOrigin ? { Authorization: `Bearer ${token}` } : undefined,
+        });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data: GameData = await res.json();
         // Normalize loosely-typed fields so optional/missing values do not crash.
@@ -611,6 +641,7 @@ export const useGameStore = create<GameState>((set, get) => {
         variables: vars,
         visibleCharacters: [],
         background: resolveUrl(sceneDef?.background, data._asset_manifest),
+        backgroundPosition: "center",
         bgmSrc: resolveUrl(sceneDef?.bgm, data._asset_manifest),
         currentText: "",
         currentCharacter: null,
@@ -748,6 +779,7 @@ export const useGameStore = create<GameState>((set, get) => {
         commandIndex: 0,
         visibleCharacters: [],
         background: resolveUrl(sceneDef.background, data._asset_manifest) || get().background,
+        backgroundPosition: "center",
         bgmSrc: resolveUrl(sceneDef.bgm, data._asset_manifest) || get().bgmSrc,
         currentVoice: null,
       });
@@ -773,6 +805,7 @@ export const useGameStore = create<GameState>((set, get) => {
         variables: { ...state.variables },
         characters: [...state.visibleCharacters],
         background: state.background,
+        backgroundPosition: state.backgroundPosition,
         bgmSrc: state.bgmSrc,
         title: state.gameData?.meta.title || "",
         description: state.currentText.slice(0, 60),
@@ -794,6 +827,7 @@ export const useGameStore = create<GameState>((set, get) => {
         variables: { ...slot.variables },
         visibleCharacters: [...slot.characters],
         background: slot.background,
+        backgroundPosition: slot.backgroundPosition || "center",
         bgmSrc: slot.bgmSrc,
         currentText: "",
         currentCharacter: null,

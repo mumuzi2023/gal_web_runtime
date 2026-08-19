@@ -9,6 +9,7 @@ const positionMap: Record<string, string> = {
 
 export default function BackgroundLayer() {
   const background = useGameStore((s) => s.background);
+  const backgroundPosition = useGameStore((s) => s.backgroundPosition);
   const visibleCharacters = useGameStore((s) => s.visibleCharacters);
   const gameData = useGameStore((s) => s.gameData);
   const currentCharacter = useGameStore((s) => s.currentCharacter);
@@ -19,15 +20,17 @@ export default function BackgroundLayer() {
   const cgSrc = useGameStore((s) => s.cgSrc);
   const cgMode = useGameStore((s) => s.cgMode);
 
-  const resolveExpression = (charKey: string, expr: string): string => {
+  const resolveExpression = (charKey: string, expr: string, outfitId?: string): string => {
     if (!gameData) return "";
     const charDef = gameData.characters[charKey];
     if (!charDef) return "";
     const manifest = gameData._asset_manifest;
+    const outfit = charDef.outfits?.[outfitId || charDef.default_outfit || "default"];
+    const expressions = outfit?.expressions || charDef.expressions;
     const raw =
-      charDef.expressions[expr] ||
-      charDef.expressions["normal"] ||
-      Object.values(charDef.expressions)[0] ||
+      expressions[expr] ||
+      expressions["normal"] ||
+      Object.values(expressions)[0] ||
       "";
     if (!raw) return "";
     if (raw.startsWith("http")) return raw;
@@ -50,6 +53,7 @@ export default function BackgroundLayer() {
           src={background}
           alt=""
           className="absolute inset-0 w-full h-full object-cover animate-[fadeIn_0.8s_ease-out]"
+          style={{ objectPosition: backgroundPosition }}
           onError={(e) => {
             (e.target as HTMLImageElement).style.display = "none";
           }}
@@ -65,7 +69,7 @@ export default function BackgroundLayer() {
       {/* Character sprites — left/center/right positions */}
       <div className="absolute inset-0">
         {visibleCharacters.map((vc) => {
-          const spriteUrl = resolveExpression(vc.key, vc.expression);
+          const spriteUrl = resolveExpression(vc.key, vc.expression, vc.outfitId);
           const side = vc.position === "right" ? "right" : vc.position === "center" ? "center" : "left";
           const pos = positionMap[side];
           const isSpeaking = vc.key === speakingKey;

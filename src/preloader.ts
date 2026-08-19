@@ -46,9 +46,15 @@ export function collectImageUrls(gameData: GameData): string[] {
 
   // Character expressions
   for (const char of Object.values(gameData.characters)) {
-    for (const expr of Object.values(char.expressions)) {
-      const url = resolve(expr);
-      if (url) urls.push(url);
+    const outfitDefs = char.outfits ? Object.values(char.outfits) : [];
+    const expressionSets = outfitDefs.length
+      ? outfitDefs.map((outfit) => outfit.expressions)
+      : [char.expressions];
+    for (const expressions of expressionSets) {
+      for (const expr of Object.values(expressions)) {
+        const url = resolve(expr);
+        if (url) urls.push(url);
+      }
     }
   }
 
@@ -102,7 +108,9 @@ export function preloadSceneAssets(gameData: GameData, sceneKey: string): void {
       const charDef = gameData.characters[cmd.character];
       if (charDef) {
         const expr = cmd.expression || "normal";
-        const raw = charDef.expressions[expr] || charDef.expressions["normal"] || Object.values(charDef.expressions)[0] || "";
+        const outfit = charDef.outfits?.[cmd.outfit_id || charDef.default_outfit || "default"];
+        const expressions = outfit?.expressions || charDef.expressions;
+        const raw = expressions[expr] || expressions["normal"] || Object.values(expressions)[0] || "";
         if (raw) {
           const url = resolve(raw);
           if (url) urls.push(url);

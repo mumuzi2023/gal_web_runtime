@@ -25,15 +25,17 @@ export default function SaveLoadScreen() {
     }
   };
 
-  const resolveExpression = (charKey: string, expr: string): string => {
+  const resolveExpression = (charKey: string, expr: string, outfitId?: string): string => {
     if (!gameData) return "";
     const charDef = gameData.characters[charKey];
     if (!charDef) return "";
     const manifest = gameData._asset_manifest;
+    const outfit = charDef.outfits?.[outfitId || charDef.default_outfit || "default"];
+    const expressions = outfit?.expressions || charDef.expressions;
     const raw =
-      charDef.expressions[expr] ||
-      charDef.expressions["normal"] ||
-      Object.values(charDef.expressions)[0] ||
+      expressions[expr] ||
+      expressions["normal"] ||
+      Object.values(expressions)[0] ||
       "";
     if (!raw) return "";
     if (raw.startsWith("http")) return raw;
@@ -81,7 +83,7 @@ export default function SaveLoadScreen() {
                     />
                     <div className="absolute inset-0">
                       {slot.characters.map((vc) => {
-                        const spriteUrl = resolveExpression(vc.key, vc.expression);
+                        const spriteUrl = resolveExpression(vc.key, vc.expression, vc.outfitId);
                         if (!spriteUrl) return null;
                         const posStyle: React.CSSProperties = {
                           position: "absolute",

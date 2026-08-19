@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import { useGameStore } from "./store";
 import TitleScreen from "./components/TitleScreen";
 import BackgroundLayer from "./components/BackgroundLayer";
@@ -24,6 +24,13 @@ export default function App() {
   const error = useGameStore((s) => s.error);
   const gameData = useGameStore((s) => s.gameData);
   const screen = useGameStore((s) => s.screen);
+  const commandIndex = useGameStore((s) => s.commandIndex);
+  const waitingForChoice = useGameStore((s) => s.waitingForChoice);
+  const choiceOptions = useGameStore((s) => s.choiceOptions);
+  const startNewGame = useGameStore((s) => s.startNewGame);
+  const advanceCommand = useGameStore((s) => s.advanceCommand);
+  const selectChoice = useGameStore((s) => s.selectChoice);
+  const studioStarted = useRef(false);
 
   const updateFontScale = useCallback(() => {
     const vw = window.innerWidth;
@@ -51,6 +58,28 @@ export default function App() {
     const url = params.get("data") || `${import.meta.env.BASE_URL}game_data.json`;
     loadGameData(url);
   }, [loadGameData]);
+
+  // Studio embeds the real runtime in an iframe.  It must skip the title
+  // screen and seek to the command selected by the editor, while the normal
+  // player keeps its existing title/new-game flow unchanged.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("studio") !== "1" || !gameData || studioStarted.current) return;
+    studioStarted.current = true;
+    startNewGame();
+  }, [gameData, startNewGame]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("studio") !== "1" || screen !== "game") return;
+    const target = Math.max(0, Number(params.get("command") || 0));
+    if (commandIndex >= target) return;
+    const timer = window.setTimeout(() => {
+      if (waitingForChoice && choiceOptions[0]) selectChoice(choiceOptions[0]);
+      else advanceCommand();
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [screen, commandIndex, waitingForChoice, choiceOptions, advanceCommand, selectChoice]);
 
   if (loading || (!gameData && !error)) {
     return (
