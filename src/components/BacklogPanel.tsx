@@ -1,12 +1,11 @@
 import { useRef, useEffect } from "react";
-import { useGameStore, resolveOverlayBackground } from "../store";
-import { panelOverlayStyle, defaultLightPanel } from "../uiConfig";
+import { useGameStore } from "../store";
 
 export default function BacklogPanel() {
   const screen = useGameStore((s) => s.screen);
-  const setScreen = useGameStore((s) => s.setScreen);
+  const closeOverlay = useGameStore((s) => s.closeOverlay);
+  const playVoice = useGameStore((s) => s.playVoice);
   const backlog = useGameStore((s) => s.backlog);
-  const background = useGameStore((s) => s.background);
   const gameData = useGameStore((s) => s.gameData);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -15,10 +14,6 @@ export default function BacklogPanel() {
   }, [backlog.length]);
 
   if (screen !== "backlog") return null;
-
-  const panelCfg = gameData?.config?.ui?.backlogPanel;
-  const overlayCss = panelOverlayStyle(panelCfg, defaultLightPanel);
-  const bgUrl = resolveOverlayBackground(background, gameData);
 
   const resolveAvatar = (charKey: string | undefined, outfitId?: string): string => {
     if (!charKey || !gameData) return "";
@@ -44,24 +39,18 @@ export default function BacklogPanel() {
   };
 
   return (
-    <div className="absolute inset-0 z-50 flex flex-col">
-      {bgUrl && (
-        <img src={bgUrl} alt="" className="absolute inset-0 w-full h-full object-cover" onError={(e)=>{(e.target as HTMLImageElement).style.display='none';}} />
-      )}
-      <div className="absolute inset-0" style={overlayCss} />
+    <div className="runtime-overlay" role="dialog" aria-modal="true" aria-labelledby="backlog-title">
+      <div className="runtime-overlay__scrim" />
+      <section className="runtime-overlay__surface backlog-surface">
+        <header className="runtime-overlay__header">
+          <div>
+            <h2 id="backlog-title" className="runtime-overlay__title">对话记录</h2>
+            <div className="runtime-overlay__subtitle">回看已经播放过的台词和旁白</div>
+          </div>
+          <button onClick={closeOverlay} className="runtime-overlay__close" aria-label="关闭记录">✕</button>
+        </header>
 
-      <div className="relative flex flex-col h-full">
-        <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-bold text-gray-800">对话记录</h2>
-          <button
-            onClick={() => setScreen("game")}
-            className="text-gray-500 hover:text-gray-800 transition text-sm"
-          >
-            ✕ 关闭
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-6 py-4 backlog-scroll">
+        <div className="runtime-overlay__body backlog-scroll backlog-list">
           {backlog.length === 0 ? (
             <p className="text-gray-400 text-center mt-8">暂无记录</p>
           ) : (
@@ -73,7 +62,7 @@ export default function BacklogPanel() {
                       <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
                     </div>
                   )}
-                  <div className="flex items-start gap-3 py-1.5">
+                  <article className="backlog-entry">
                     {entry.character ? (
                       <div className="flex-shrink-0 w-10 h-10 rounded-full overflow-hidden border-2 border-gray-200 bg-gray-100">
                         {resolveAvatar(entry.character, entry.outfitId) ? (
@@ -95,7 +84,7 @@ export default function BacklogPanel() {
                       </div>
                     )}
 
-                    <div className="flex-1 text-sm min-w-0">
+                    <div className="backlog-entry__copy">
                       {entry.characterName ? (
                         <>
                           <span
@@ -110,14 +99,24 @@ export default function BacklogPanel() {
                         <span className="text-gray-500 italic">{entry.text}</span>
                       )}
                     </div>
-                  </div>
+                    {entry.voice && (
+                      <button
+                        type="button"
+                        className="backlog-entry__voice"
+                        onClick={() => playVoice(entry.voice || "")}
+                        aria-label={`重播${entry.characterName || "旁白"}的语音`}
+                      >
+                        ▶
+                      </button>
+                    )}
+                  </article>
                 </div>
               ))}
               <div ref={bottomRef} />
             </div>
           )}
         </div>
-      </div>
+      </section>
     </div>
   );
 }

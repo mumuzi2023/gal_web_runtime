@@ -23,7 +23,6 @@ export default function DialogBox() {
   const autoSpeed = useGameStore((s) => s.settings.autoSpeed);
   const toggleAutoMode = useGameStore((s) => s.toggleAutoMode);
   const setScreen = useGameStore((s) => s.setScreen);
-  const cgSrc = useGameStore((s) => s.cgSrc);
   const gameData = useGameStore((s) => s.gameData);
 
   const ui = gameData?.config?.ui;
@@ -31,8 +30,8 @@ export default function DialogBox() {
   const nameplateCss = nameplateStyle(ui?.nameplate, currentCharacterColor);
   const menuOverrides = ui?.menuButtonOverrides || {};
 
-  const [displayedText, setDisplayedText] = useState("");
-  const [typingComplete, setTypingComplete] = useState(false);
+  const [displayedText, setDisplayedText] = useState(isTyping ? "" : currentText);
+  const [typingComplete, setTypingComplete] = useState(!isTyping);
   const timerRef = useRef<ReturnType<typeof setInterval>>(undefined);
   const autoTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const charIndexRef = useRef(0);
@@ -40,10 +39,6 @@ export default function DialogBox() {
   // Typewriter effect
   useEffect(() => {
     if (!isTyping || !currentText) return;
-
-    setDisplayedText("");
-    setTypingComplete(false);
-    charIndexRef.current = 0;
 
     const interval = Math.max(10, 1000 / textSpeed);
     timerRef.current = setInterval(() => {
@@ -70,11 +65,6 @@ export default function DialogBox() {
   }, [autoMode, waitingForClick, typingComplete, autoSpeed, advanceCommand]);
 
   const handleClick = useCallback(() => {
-    if (cgSrc) {
-      useGameStore.setState({ cgSrc: null });
-      useGameStore.getState().advanceCommand();
-      return;
-    }
     if (isTyping) {
       clearInterval(timerRef.current);
       setDisplayedText(currentText);
@@ -83,7 +73,7 @@ export default function DialogBox() {
     } else if (waitingForClick) {
       advanceCommand();
     }
-  }, [isTyping, waitingForClick, currentText, finishTyping, advanceCommand, cgSrc]);
+  }, [isTyping, waitingForClick, currentText, finishTyping, advanceCommand]);
 
   if (waitingForChoice || (!currentText && !waitingForClick)) return null;
 
@@ -101,13 +91,12 @@ export default function DialogBox() {
   ];
 
   return (
-    <div className="absolute inset-0 z-20" onClick={handleClick}>
-      {/* Dialog box — bottom 25% of screen, 90% width, centered */}
-      <div className="absolute bottom-0 left-[5%] right-[5%] h-[25vh] rounded-t-xl bg-black/75 backdrop-blur-md border-t border-white/10" style={textboxCss}>
+    <div className="dialog-click-layer" onClick={handleClick}>
+      <section className="dialog-panel" style={textboxCss} aria-live="polite">
         {/* Name plate — floating above the dialog box */}
         {currentCharacter && (
           <div
-            className="absolute -top-10 left-6 px-5 py-1.5 rounded-t-lg text-sm font-bold"
+            className="dialog-nameplate"
             style={nameplateCss}
           >
             {currentCharacter}
@@ -115,7 +104,7 @@ export default function DialogBox() {
         )}
 
         {/* Menu buttons — top-right corner of dialog box */}
-        <div className="absolute top-2 right-4 flex gap-2">
+        <nav className="dialog-toolbar" aria-label="游戏菜单">
           {menuActions.map((a) => (
             <MenuButton
               key={a.key}
@@ -128,11 +117,11 @@ export default function DialogBox() {
               base={ui?.menuButtons}
             />
           ))}
-        </div>
+        </nav>
 
         {/* Text area */}
         <div
-          className="px-8 py-6 pr-16 h-full overflow-y-auto text-[1.05rem] leading-[1.8]"
+          className="dialog-copy"
           style={{ color: ui?.textbox?.textColor || "rgba(255,255,255,0.9)" }}
         >
           {displayedText}
@@ -141,9 +130,9 @@ export default function DialogBox() {
 
         {/* CTC indicator — bottom-right, bouncing triangle */}
         {waitingForClick && !autoMode && (
-          <div className="absolute bottom-3 right-4 text-white/50 text-sm ctc-bounce">&#9660;</div>
+          <div className="dialog-continue ctc-bounce" aria-hidden="true">⌄</div>
         )}
-      </div>
+      </section>
     </div>
   );
 }
@@ -172,8 +161,8 @@ function MenuButton({
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      style={{ ...normal, ...(hovered ? hover : {}), fontSize: "12px" }}
-      className="transition cursor-pointer"
+      style={{ ...normal, ...(hovered ? hover : {}) }}
+      className="dialog-tool-button"
     >
       {label}
     </button>

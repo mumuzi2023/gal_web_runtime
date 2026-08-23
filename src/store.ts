@@ -5,11 +5,19 @@ import type {
   VisibleCharacter,
   BacklogEntry,
   SaveSlot,
+  SoundEffectEvent,
   Screen,
   ChoiceOption,
+  BaseScreen,
 } from "./types";
 import { evaluateCondition, applySet } from "./engine";
-import { preloadImages, collectImageUrls, preloadNextScene } from "./preloader";
+import {
+  collectImageUrls,
+  getStartSceneKey,
+  preloadConnectedScenes,
+  preloadImages,
+  preloadStartupAssets,
+} from "./preloader";
 
 const SAVE_KEY = "galgame_saves";
 const SETTINGS_KEY = "galgame_settings";
@@ -18,7 +26,7 @@ const MAX_SLOTS = 20;
 /** Resolve a relative asset path using the _asset_manifest */
 function resolveUrl(path: string | undefined, manifest: Record<string, string> | undefined): string {
   if (!path) return "";
-  if (path.startsWith("http")) return path;
+  if (/^(https?:|data:|blob:)/i.test(path)) return path;
   if (manifest) {
     const resolved = manifest[path];
     if (resolved) return resolved;
@@ -32,12 +40,12 @@ export function resolveOverlayBackground(
   current: string | undefined,
   data: GameData | null | undefined,
 ): string {
-  if (current && current.startsWith("http")) return current;
+  if (current) return current;
   if (!data) return current || "";
   for (const sk of data.scene_order || Object.keys(data.scenes || {})) {
     const sceneBg = data.scenes?.[sk]?.background;
     const url = resolveUrl(sceneBg, data._asset_manifest);
-    if (url && url.startsWith("http")) return url;
+    if (url) return url;
   }
   return current || "";
 }
@@ -69,10 +77,20 @@ export interface GameState {
   // Navigation
   screen: Screen;
   setScreen: (s: Screen) => void;
+  overlayReturnScreen: BaseScreen;
+  closeOverlay: () => void;
+
+  // Startup/preload feedback
+  preloadProgress: number;
+  preloadLabel: string;
+  preloadFailures: string[];
 
   // Playback state
   currentSceneKey: string;
   commandIndex: number;
+  commandSerial: number;
+  commandQueue: Command[];
+  activeInlineCommand: Command | null;
   variables: Record<string, number>;
   visibleCharacters: VisibleCharacter[];
   background: string;
@@ -80,8 +98,10 @@ export interface GameState {
   bgmSrc: string;
   currentText: string;
   currentCharacter: string | null;
+  currentCharacterKey: string | null;
   currentCharacterColor: string | null;
   currentVoice: string | null;
+  voiceToken: number;
   isTyping: boolean;
   waitingForClick: boolean;
   waitingForChoice: boolean;
@@ -97,6 +117,9 @@ export interface GameState {
   cgSrc: string | null;
   cgMode: "full" | "half";
   seSrc: string | null;
+  seToken: number;
+  soundEffects: SoundEffectEvent[];
+  visitedScenes: string[];
 
   // Backlog
   backlog: BacklogEntry[];
@@ -121,6 +144,8 @@ export interface GameState {
   jumpToScene: (sceneKey: string) => void;
   finishTyping: () => void;
   toggleAutoMode: () => void;
+  dismissCg: () => void;
+  playVoice: (src: string) => void;
   saveGame: (slotId: number) => void;
   loadGame: (slotId: number) => void;
   setShaking: (v: boolean) => void;
@@ -174,6 +199,7 @@ export const useGameStore = create<GameState>((set, get) => {
   };
 
   const executeCommand = (cmd: Command) => {
+    set((current) => ({ commandSerial: current.commandSerial + 1 }));
     const state = get();
     const data = state.gameData;
     if (!data) return;
@@ -191,9 +217,7 @@ export const useGameStore = create<GameState>((set, get) => {
       case "show": {
         const chars = [...state.visibleCharacters];
         const existing = chars.findIndex((c) => c.key === cmd.character);
-        const rawPos = cmd.position ?? (existing >= 0 ? chars[existing].position : "left");
-        // Support left/center/right positions
-        const position = rawPos === "right" || rawPos === "far-right" ? "right" : rawPos === "center" ? "center" : "left";
+        const position = cmd.position ?? (existing >= 0 ? chars[existing].position : "left");
         const isNew = existing < 0;
         const vc: VisibleCharacter = {
           key: cmd.character,
@@ -202,9 +226,9 @@ export const useGameStore = create<GameState>((set, get) => {
           position,
           entering: isNew,
         };
-        const easyMode = (data.config?.mode ?? "easy") === "easy";
-        if (easyMode) {
-          // Enforce one-at-a-time: only the shown character remains visible
+        if ((data.config?.mode ?? "advanced") === "easy") {
+          // Easy mode keeps a single speaker on stage for legacy scripts that
+          // never emit hide commands. Generated scripts default to advanced.
           set({ visibleCharacters: [vc] });
         } else {
           // Advanced: update in place or append, keep others visible
@@ -244,7 +268,7 @@ export const useGameStore = create<GameState>((set, get) => {
 
       case "dialog": {
         const charDef = data.characters[cmd.character];
-        const easyMode = (data.config?.mode ?? "easy") === "easy";
+        const easyMode = (data.config?.mode ?? "advanced") === "easy";
         const isVisible = state.visibleCharacters.some((c) => c.key === cmd.character);
         let newVisibleChars: VisibleCharacter[];
         if (easyMode && !isVisible) {
@@ -280,8 +304,10 @@ export const useGameStore = create<GameState>((set, get) => {
           visibleCharacters: newVisibleChars,
           currentText: cmd.text,
           currentCharacter: charDef?.name || cmd.character,
+          currentCharacterKey: cmd.character,
           currentCharacterColor: charDef?.color || null,
-          currentVoice: cmd.voice || null,
+          currentVoice: resolveUrl(cmd.voice, data._asset_manifest) || null,
+          voiceToken: state.voiceToken + 1,
           isTyping: true,
           waitingForClick: false,
           waitingForChoice: false,
@@ -296,7 +322,7 @@ export const useGameStore = create<GameState>((set, get) => {
               characterName: charDef?.name || cmd.character,
               characterColor: charDef?.color,
               text: cmd.text,
-              voice: cmd.voice,
+              voice: resolveUrl(cmd.voice, data._asset_manifest) || undefined,
             },
           ],
         }));
@@ -307,14 +333,16 @@ export const useGameStore = create<GameState>((set, get) => {
         set({
           currentText: cmd.text,
           currentCharacter: null,
+          currentCharacterKey: null,
           currentCharacterColor: null,
-          currentVoice: cmd.voice || null,
+          currentVoice: resolveUrl(cmd.voice, data._asset_manifest) || null,
+          voiceToken: state.voiceToken + 1,
           isTyping: true,
           waitingForClick: false,
           waitingForChoice: false,
         });
         set((s) => ({
-          backlog: [...s.backlog, { text: cmd.text, voice: cmd.voice }],
+          backlog: [...s.backlog, { text: cmd.text, voice: resolveUrl(cmd.voice, data._asset_manifest) || undefined }],
         }));
         break;
       }
@@ -338,13 +366,21 @@ export const useGameStore = create<GameState>((set, get) => {
       }
 
       case "bgm": {
-        set({ bgmSrc: cmd.src });
+        set({ bgmSrc: resolveUrl(cmd.src, data._asset_manifest) });
         get().advanceCommand();
         break;
       }
 
       case "se": {
-        set({ seSrc: resolveUrl(cmd.src, data._asset_manifest) });
+        const src = resolveUrl(cmd.src, data._asset_manifest);
+        const eventId = state.seToken + 1;
+        set({
+          seSrc: src,
+          seToken: eventId,
+          // Keep a small event log so synchronous commands are not collapsed
+          // into a single React render. AudioManager consumes every new id.
+          soundEffects: [...state.soundEffects, { id: eventId, src }].slice(-32),
+        });
         get().advanceCommand();
         break;
       }
@@ -383,27 +419,25 @@ export const useGameStore = create<GameState>((set, get) => {
         const branch = result ? cmd.then : cmd.else;
         if (branch) {
           const cmds = Array.isArray(branch) ? branch : [branch];
-          // Execute first command of the branch, queue rest
-          // For simplicity, execute all non-blocking commands, stop at first blocking one
-          for (const c of cmds) {
-            get().executeCommand(c as Command);
-            // If it produced a dialog/narration/choice, stop
-            const afterState = get();
-            if (afterState.isTyping || afterState.waitingForClick || afterState.waitingForChoice) {
-              return;
-            }
+          if (cmds.length > 0) {
+            const [first, ...remaining] = cmds;
+            set({
+              activeInlineCommand: first,
+              commandQueue: [...remaining, ...state.commandQueue],
+            });
+            get().executeCommand(first);
+            return;
           }
         }
-        if (!get().isTyping && !get().waitingForClick && !get().waitingForChoice) {
-          get().advanceCommand();
-        }
+        get().advanceCommand();
         break;
       }
 
       case "wait": {
         const duration = cmd.duration || 1000;
+        const serial = get().commandSerial;
         setTimeout(() => {
-          get().advanceCommand();
+          if (get().commandSerial === serial) get().advanceCommand();
         }, duration);
         break;
       }
@@ -434,13 +468,15 @@ export const useGameStore = create<GameState>((set, get) => {
         // Skip CG when the asset is missing — otherwise we'd show a black overlay
         // with a broken-image inside, which players experience as "the screen
         // suddenly went black mid-click".
-        if (!resolved || !resolved.startsWith("http")) {
+        if (!resolved) {
           get().advanceCommand();
           break;
         }
         set({
           cgSrc: resolved,
           cgMode: cmd.mode === "half" ? "half" : "full",
+          isTyping: false,
+          waitingForClick: false,
         });
         // CG stays until click
         break;
@@ -452,8 +488,9 @@ export const useGameStore = create<GameState>((set, get) => {
           chapterTitle: cmd.text,
           chapterSubtitle: cmd.subtitle || "",
         });
+        const serial = get().commandSerial;
         setTimeout(() => {
-          get().dismissChapterTitle();
+          if (get().commandSerial === serial) get().dismissChapterTitle();
         }, 3000);
         break;
       }
@@ -483,7 +520,14 @@ export const useGameStore = create<GameState>((set, get) => {
             }
           }
         }
-        set({ screen: "title" });
+        set({
+          screen: "title",
+          overlayReturnScreen: "title",
+          bgmSrc: "",
+          currentVoice: null,
+          commandQueue: [],
+          activeInlineCommand: null,
+        });
         break;
       }
 
@@ -507,11 +551,28 @@ export const useGameStore = create<GameState>((set, get) => {
 
     // Navigation
     screen: "title",
-    setScreen: (s) => set({ screen: s }),
+    overlayReturnScreen: "title",
+    setScreen: (screen) => set((state) => {
+      if (screen === "title" || screen === "game") {
+        return { screen, overlayReturnScreen: screen };
+      }
+      const base = state.screen === "title" || state.screen === "game"
+        ? state.screen
+        : state.overlayReturnScreen;
+      return { screen, overlayReturnScreen: base };
+    }),
+    closeOverlay: () => set((state) => ({ screen: state.overlayReturnScreen })),
+
+    preloadProgress: 0,
+    preloadLabel: "读取游戏数据…",
+    preloadFailures: [],
 
     // Playback
     currentSceneKey: "",
     commandIndex: 0,
+    commandSerial: 0,
+    commandQueue: [],
+    activeInlineCommand: null,
     variables: {},
     visibleCharacters: [],
     background: "",
@@ -519,8 +580,10 @@ export const useGameStore = create<GameState>((set, get) => {
     bgmSrc: "",
     currentText: "",
     currentCharacter: null,
+    currentCharacterKey: null,
     currentCharacterColor: null,
     currentVoice: null,
+    voiceToken: 0,
     isTyping: false,
     waitingForClick: false,
     waitingForChoice: false,
@@ -536,6 +599,9 @@ export const useGameStore = create<GameState>((set, get) => {
     cgSrc: null,
     cgMode: "full",
     seSrc: null,
+    seToken: 0,
+    soundEffects: [],
+    visitedScenes: [],
 
     // Backlog
     backlog: [],
@@ -556,7 +622,13 @@ export const useGameStore = create<GameState>((set, get) => {
 
     // Actions
     loadGameData: async (url: string) => {
-      set({ loading: true, error: null });
+      set({
+        loading: true,
+        error: null,
+        preloadProgress: 0.05,
+        preloadLabel: "读取游戏数据…",
+        preloadFailures: [],
+      });
       try {
         const token = localStorage.getItem("token");
         const resolvedUrl = new URL(url, window.location.href);
@@ -606,12 +678,37 @@ export const useGameStore = create<GameState>((set, get) => {
         if (anyData.scenes == null || typeof anyData.scenes !== "object" || Array.isArray(anyData.scenes)) {
           anyData.scenes = {};
         }
-        set({ gameData: data, loading: false });
-        // Preload all images in background
-        const imageUrls = collectImageUrls(data);
-        preloadImages(imageUrls);
+        set({
+          gameData: data,
+          preloadProgress: 0.15,
+          preloadLabel: "预载首章资源…",
+        });
+        const report = await preloadStartupAssets(data, (completed, total) => {
+          set({
+            preloadProgress: total ? 0.15 + (completed / total) * 0.8 : 0.95,
+            preloadLabel: total ? `预载首章资源 ${completed}/${total}` : "准备完成",
+          });
+        });
+        set({
+          loading: false,
+          preloadProgress: 1,
+          preloadLabel: "准备完成",
+          preloadFailures: report.failed,
+        });
+        // Warm the remaining images without extending the startup gate.
+        void preloadImages(collectImageUrls(data)).then((backgroundReport) => {
+          if (backgroundReport.failed.length > 0) {
+            set((state) => ({
+              preloadFailures: [...new Set([...state.preloadFailures, ...backgroundReport.failed])],
+            }));
+          }
+        });
       } catch (e: unknown) {
-        set({ error: String(e), loading: false });
+        set({
+          error: e instanceof Error ? e.message : String(e),
+          loading: false,
+          preloadLabel: "载入失败",
+        });
       }
     },
 
@@ -625,19 +722,20 @@ export const useGameStore = create<GameState>((set, get) => {
         vars[k] = typeof v === "number" ? v : parseInt(String(v), 10) || 0;
       }
 
-      // Find first scene: prefer start_scene, then scene_order[0], then first key
-      const sceneKeys = Object.keys(data.scenes);
-      const firstScene = data.start_scene && data.scenes[data.start_scene]
-        ? data.start_scene
-        : data.scene_order?.[0] && data.scenes[data.scene_order[0]]
-          ? data.scene_order[0]
-          : sceneKeys[0] || "";
+      const firstScene = getStartSceneKey(data);
       const sceneDef = data.scenes[firstScene];
+      if (!sceneDef) {
+        set({ error: "游戏数据中没有可播放的场景" });
+        return;
+      }
 
       set({
         screen: "game",
+        overlayReturnScreen: "game",
         currentSceneKey: firstScene,
         commandIndex: 0,
+        commandQueue: [],
+        activeInlineCommand: null,
         variables: vars,
         visibleCharacters: [],
         background: resolveUrl(sceneDef?.background, data._asset_manifest),
@@ -645,6 +743,7 @@ export const useGameStore = create<GameState>((set, get) => {
         bgmSrc: resolveUrl(sceneDef?.bgm, data._asset_manifest),
         currentText: "",
         currentCharacter: null,
+        currentCharacterKey: null,
         currentCharacterColor: null,
         currentVoice: null,
         isTyping: false,
@@ -655,7 +754,11 @@ export const useGameStore = create<GameState>((set, get) => {
         autoMode: false,
         cgSrc: null,
         effectType: null,
+        soundEffects: [],
+        visitedScenes: [firstScene],
       });
+
+      preloadConnectedScenes(data, firstScene);
 
       // Execute first command
       const firstCmd = getCommandAt(firstScene, 0);
@@ -668,10 +771,21 @@ export const useGameStore = create<GameState>((set, get) => {
       if (state.waitingForChoice) return;
       // Stop voice from previous command when advancing
       set({ currentVoice: null });
+
+      // Conditional branches run as an explicit queue. This keeps branch
+      // commands from recursively incrementing the parent scene index and
+      // prevents repeated/skipped dialog, audio and jump commands.
+      if (state.commandQueue.length > 0) {
+        const [nextInline, ...remaining] = state.commandQueue;
+        set({ commandQueue: remaining, activeInlineCommand: nextInline });
+        executeCommand(nextInline);
+        return;
+      }
+
       const nextIndex = state.commandIndex + 1;
       const cmd = getCommandAt(state.currentSceneKey, nextIndex);
       if (cmd) {
-        set({ commandIndex: nextIndex });
+        set({ commandIndex: nextIndex, activeInlineCommand: null });
         executeCommand(cmd);
       } else {
         // Scene ended — try advancing to next scene in scene_order
@@ -696,12 +810,26 @@ export const useGameStore = create<GameState>((set, get) => {
                 persistEndings(endings);
                 set({ reachedEndings: endings });
               }
-              set({ screen: "title" });
+              set({
+                screen: "title",
+                overlayReturnScreen: "title",
+                bgmSrc: "",
+                currentVoice: null,
+                commandQueue: [],
+                activeInlineCommand: null,
+              });
               return;
             }
           }
         }
-        set({ screen: "title" });
+        set({
+          screen: "title",
+          overlayReturnScreen: "title",
+          bgmSrc: "",
+          currentVoice: null,
+          commandQueue: [],
+          activeInlineCommand: null,
+        });
       }
     },
 
@@ -733,13 +861,13 @@ export const useGameStore = create<GameState>((set, get) => {
       const data = get().gameData;
       let resolvedKey = sceneKey;
       if (!data) {
-        set({ screen: "title" });
+        set({ screen: "title", overlayReturnScreen: "title", bgmSrc: "" });
         return;
       }
       if (!data.scenes[sceneKey]) {
         if (data.explicit_flow) {
           console.error(`[runtime] explicit jump target "${sceneKey}" does not exist`);
-          set({ screen: "title" });
+          set({ screen: "title", overlayReturnScreen: "title", bgmSrc: "" });
           return;
         }
         // Fuzzy match: scripts sometimes reference "scene_name" but the actual
@@ -769,7 +897,7 @@ export const useGameStore = create<GameState>((set, get) => {
             }
           }
           console.error(`[runtime] jump target "${sceneKey}" not found and no fallback`);
-          set({ screen: "title" });
+          set({ screen: "title", overlayReturnScreen: "title", bgmSrc: "" });
           return;
         }
       }
@@ -777,14 +905,19 @@ export const useGameStore = create<GameState>((set, get) => {
       set({
         currentSceneKey: resolvedKey,
         commandIndex: 0,
+        commandQueue: [],
+        activeInlineCommand: null,
         visibleCharacters: [],
         background: resolveUrl(sceneDef.background, data._asset_manifest) || get().background,
         backgroundPosition: "center",
         bgmSrc: resolveUrl(sceneDef.bgm, data._asset_manifest) || get().bgmSrc,
         currentVoice: null,
+        currentCharacterKey: null,
+        visitedScenes: [...new Set([...get().visitedScenes, resolvedKey])],
       });
-      // Preload next scene's assets in background to avoid loading flicker
-      preloadNextScene(data, resolvedKey);
+      // Branch-aware preload: warm every legal next scene instead of guessing
+      // from scene_order, which is wrong after routes diverge.
+      preloadConnectedScenes(data, resolvedKey);
       const firstCmd = sceneDef.commands[0];
       if (firstCmd) executeCommand(firstCmd);
     },
@@ -795,6 +928,17 @@ export const useGameStore = create<GameState>((set, get) => {
 
     toggleAutoMode: () => set((s) => ({ autoMode: !s.autoMode })),
 
+    dismissCg: () => {
+      if (!get().cgSrc) return;
+      set({ cgSrc: null });
+      get().advanceCommand();
+    },
+
+    playVoice: (src: string) => {
+      if (!src) return;
+      set((state) => ({ currentVoice: src, voiceToken: state.voiceToken + 1 }));
+    },
+
     saveGame: (slotId: number) => {
       const state = get();
       const slot: SaveSlot = {
@@ -802,11 +946,14 @@ export const useGameStore = create<GameState>((set, get) => {
         timestamp: Date.now(),
         sceneKey: state.currentSceneKey,
         commandIndex: state.commandIndex,
+        commandQueue: [...state.commandQueue],
+        activeInlineCommand: state.activeInlineCommand || undefined,
         variables: { ...state.variables },
         characters: [...state.visibleCharacters],
         background: state.background,
         backgroundPosition: state.backgroundPosition,
         bgmSrc: state.bgmSrc,
+        visitedScenes: [...state.visitedScenes],
         title: state.gameData?.meta.title || "",
         description: state.currentText.slice(0, 60),
       };
@@ -822,8 +969,11 @@ export const useGameStore = create<GameState>((set, get) => {
       if (!slot) return;
       set({
         screen: "game",
+        overlayReturnScreen: "game",
         currentSceneKey: slot.sceneKey,
         commandIndex: slot.commandIndex,
+        commandQueue: [...(slot.commandQueue || [])],
+        activeInlineCommand: slot.activeInlineCommand || null,
         variables: { ...slot.variables },
         visibleCharacters: [...slot.characters],
         background: slot.background,
@@ -831,19 +981,22 @@ export const useGameStore = create<GameState>((set, get) => {
         bgmSrc: slot.bgmSrc,
         currentText: "",
         currentCharacter: null,
+        currentCharacterKey: null,
         currentCharacterColor: null,
         currentVoice: null,
         isTyping: false,
         waitingForClick: false,
         waitingForChoice: false,
         choiceOptions: [],
+        visitedScenes: slot.visitedScenes?.length ? [...slot.visitedScenes] : [slot.sceneKey],
       });
       // Re-execute current command
       const data = get().gameData;
       if (data) {
         const scene = data.scenes[slot.sceneKey];
-        if (scene && scene.commands[slot.commandIndex]) {
-          executeCommand(scene.commands[slot.commandIndex]);
+        const resumedCommand = slot.activeInlineCommand || scene?.commands[slot.commandIndex];
+        if (resumedCommand) {
+          executeCommand(resumedCommand);
         }
       }
     },

@@ -9,20 +9,22 @@ export default function ChapterTitle() {
   if (!show) return null;
 
   return (
-    <div
-      className="absolute inset-0 z-40 flex items-center justify-center bg-black/60 animate-[fadeIn_0.5s_ease-out]"
+    <button
+      type="button"
+      className="chapter-card-layer animate-[fadeIn_0.5s_ease-out]"
       onClick={dismiss}
+      aria-label="关闭章节标题"
     >
-      <div className="text-center">
-        <h1 className="text-4xl font-bold text-white tracking-wider mb-2 animate-[fadeSlideIn_0.8s_ease-out]">
+      <div className="chapter-card">
+        <h1 className="animate-[fadeSlideIn_0.8s_ease-out]">
           {title}
         </h1>
         {subtitle && (
-          <p className="text-lg text-white/70 tracking-wide animate-[fadeSlideIn_1s_ease-out]">
+          <p className="animate-[fadeSlideIn_1s_ease-out]">
             {subtitle}
           </p>
         )}
       </div>
-    </div>
+    </button>
   );
 }

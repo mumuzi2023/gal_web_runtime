@@ -10,18 +10,20 @@ import type {
 /* ── Defaults (match runtime hard-coded look) ── */
 
 export const defaultMenuButton: UiButtonStyle = {
-  background: "rgba(0, 0, 0, 0.6)",
-  textColor: "rgba(255, 255, 255, 0.6)",
-  borderRadius: "4px",
-  padding: "2px 8px",
-  hoverBackground: "rgba(255, 255, 255, 0.2)",
+  background: "rgba(255, 255, 255, 0.035)",
+  textColor: "rgba(239, 244, 255, 0.72)",
+  borderColor: "rgba(190, 210, 255, 0.14)",
+  borderRadius: "9px",
+  padding: "7px 11px",
+  hoverBackground: "rgba(103, 139, 215, 0.16)",
+  hoverBorderColor: "rgba(145, 184, 255, 0.42)",
 };
 
 export const defaultTitleButton: UiButtonStyle = {
-  background: "rgba(255, 255, 255, 0.10)",
-  borderColor: "rgba(255, 255, 255, 0.20)",
+  background: "rgba(11, 18, 33, 0.56)",
+  borderColor: "rgba(196, 216, 255, 0.20)",
   borderWidth: "1px",
-  borderRadius: "6px",
+  borderRadius: "12px",
   textColor: "rgba(255, 255, 255, 0.90)",
   hoverBackground: "rgba(255, 255, 255, 0.20)",
   hoverBorderColor: "rgba(255, 255, 255, 0.40)",
@@ -30,23 +32,22 @@ export const defaultTitleButton: UiButtonStyle = {
 };
 
 export const defaultLightPanel: UiPanelStyle = {
-  background: "rgba(255, 255, 255, 0.90)",
-  borderColor: "rgba(229, 231, 235, 1)",
+  background: "rgba(9, 15, 28, 0.91)",
+  borderColor: "rgba(196, 216, 255, 0.20)",
   borderWidth: "1px",
-  borderRadius: "12px",
-  textColor: "rgba(31, 41, 55, 1)",
-  shadow:
-    "0 20px 25px -5px rgba(0, 0, 0, 0.10), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
-  backdropBlur: "12px",
-  overlay: "rgba(255, 255, 255, 0.40)",
-  padding: "24px",
+  borderRadius: "20px",
+  textColor: "rgba(239, 244, 255, 0.92)",
+  shadow: "0 30px 100px rgba(0, 0, 0, 0.52)",
+  backdropBlur: "16px",
+  overlay: "rgba(3, 7, 15, 0.70)",
+  padding: "0",
 };
 
 export const defaultTextbox: UiTextboxStyle = {
-  opacity: 0.82,
-  borderColor: "rgba(255, 255, 255, 0.15)",
-  borderRadius: "8px 8px 0 0",
-  textColor: "rgba(255, 255, 255, 0.90)",
+  opacity: 0.9,
+  borderColor: "rgba(190, 210, 255, 0.20)",
+  borderRadius: "18px",
+  textColor: "rgba(245, 248, 255, 0.92)",
 };
 
 export const defaultNameplate: UiNameplateStyle = {
@@ -56,12 +57,12 @@ export const defaultNameplate: UiNameplateStyle = {
 };
 
 export const defaultChoiceButton: UiButtonStyle = {
-  background: "rgba(20, 20, 40, 0.92)",
+  background: "rgba(18, 28, 49, 0.92)",
   textColor: "#fff",
   borderColor: "rgba(255, 255, 255, 0.20)",
   borderWidth: "1px",
-  borderRadius: "6px",
-  padding: "16px 24px",
+  borderRadius: "14px",
+  padding: "14px 24px",
   hoverBorderColor: "rgba(255, 255, 255, 0.60)",
 };
 

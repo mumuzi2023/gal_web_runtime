@@ -1,10 +1,13 @@
 import { useGameStore } from "../store";
 
-// Characters support left/center/right positions.
-const positionMap: Record<string, string> = {
-  left: "left-[10%]",
-  center: "left-1/2 -translate-x-1/2",
-  right: "right-[10%]",
+const positionPercent: Record<string, number> = {
+  "far-left": 10,
+  left: 22,
+  "center-left": 36,
+  center: 50,
+  "center-right": 64,
+  right: 78,
+  "far-right": 90,
 };
 
 export default function BackgroundLayer() {
@@ -12,13 +15,14 @@ export default function BackgroundLayer() {
   const backgroundPosition = useGameStore((s) => s.backgroundPosition);
   const visibleCharacters = useGameStore((s) => s.visibleCharacters);
   const gameData = useGameStore((s) => s.gameData);
-  const currentCharacter = useGameStore((s) => s.currentCharacter);
+  const currentCharacterKey = useGameStore((s) => s.currentCharacterKey);
   const shaking = useGameStore((s) => s.shaking);
   const flashing = useGameStore((s) => s.flashing);
   const flashColor = useGameStore((s) => s.flashColor);
   const effectType = useGameStore((s) => s.effectType);
   const cgSrc = useGameStore((s) => s.cgSrc);
   const cgMode = useGameStore((s) => s.cgMode);
+  const dismissCg = useGameStore((s) => s.dismissCg);
 
   const resolveExpression = (charKey: string, expr: string, outfitId?: string): string => {
     if (!gameData) return "";
@@ -37,22 +41,16 @@ export default function BackgroundLayer() {
     return manifest?.[raw] || raw;
   };
 
-  // Determine speaking character key from display name
-  const speakingKey = currentCharacter
-    ? Object.entries(gameData?.characters || {}).find(
-        ([, v]) => v.name === currentCharacter
-      )?.[0]
-    : null;
-
   return (
-    <div className={`absolute inset-0 ${shaking ? "screen-shake" : ""}`}>
+    <div className={`scene-layer ${shaking ? "screen-shake" : ""}`}>
+      <div className="scene-fallback" aria-hidden="true" />
       {/* Background image */}
       {background && (
         <img
           key={background}
           src={background}
           alt=""
-          className="absolute inset-0 w-full h-full object-cover animate-[fadeIn_0.8s_ease-out]"
+          className="scene-background animate-[fadeIn_0.8s_ease-out]"
           style={{ objectPosition: backgroundPosition }}
           onError={(e) => {
             (e.target as HTMLImageElement).style.display = "none";
@@ -61,32 +59,36 @@ export default function BackgroundLayer() {
       )}
 
       {/* Dark overlay for readability */}
-      <div className="absolute inset-0 bg-black/10" />
+      <div className="scene-vignette" />
 
       {/* Effect particles */}
       {effectType && <EffectParticles type={effectType} />}
 
       {/* Character sprites — left/center/right positions */}
-      <div className="absolute inset-0">
-        {visibleCharacters.map((vc) => {
+      <div className="character-stage">
+        {visibleCharacters.map((vc, index) => {
           const spriteUrl = resolveExpression(vc.key, vc.expression, vc.outfitId);
-          const side = vc.position === "right" ? "right" : vc.position === "center" ? "center" : "left";
-          const pos = positionMap[side];
-          const isSpeaking = vc.key === speakingKey;
+          const fallbackPercent = visibleCharacters.length <= 1
+            ? 50
+            : 20 + (index * 60) / Math.max(1, visibleCharacters.length - 1);
+          const x = positionPercent[vc.position] ?? fallbackPercent;
+          const isSpeaking = vc.key === currentCharacterKey;
 
           return (
             <div
               key={vc.key}
-              className={`absolute bottom-0 ${pos} h-[82%] transition-all duration-500 ease-out origin-bottom
+              className={`character-sprite transition-all duration-500 ease-out origin-bottom
                 ${vc.entering ? "character-enter" : ""}
-                ${!isSpeaking && speakingKey ? "brightness-[0.6] opacity-70 scale-[0.98]" : "brightness-100 opacity-100 scale-[1.02]"}
+                ${!isSpeaking && currentCharacterKey ? "is-listening" : "is-speaking"}
               `}
+              style={{ left: `${x}%`, zIndex: isSpeaking ? 4 : index + 1 }}
             >
               {spriteUrl && (
                 <img
+                  key={spriteUrl}
                   src={spriteUrl}
                   alt={vc.key}
-                  className="h-full w-auto object-contain drop-shadow-[0_4px_16px_rgba(0,0,0,0.5)]"
+                  className="h-full w-full object-contain object-bottom drop-shadow-[0_12px_30px_rgba(0,0,0,0.52)]"
                   onError={(e) => {
                     (e.target as HTMLImageElement).style.display = "none";
                   }}
@@ -99,31 +101,43 @@ export default function BackgroundLayer() {
 
       {/* CG overlay */}
       {cgSrc && cgMode === "full" && (
-        <div className="absolute inset-0 z-30 bg-black flex items-center justify-center">
+        <button
+          type="button"
+          className="cg-overlay cg-overlay--full"
+          onClick={dismissCg}
+          aria-label="继续剧情"
+        >
           <img
             src={cgSrc}
             alt=""
-            className="max-w-full max-h-full object-contain"
+            className="cg-overlay__image"
             onError={() => {
-              // Asset failed to load — clear CG so the underlying scene shows
-              // through instead of leaving the player on a black screen.
-              useGameStore.setState({ cgSrc: null });
+              // A missing CG must not trap the story on a command that can no
+              // longer receive clicks. Skip it and continue the script.
+              dismissCg();
             }}
           />
-        </div>
+          <span className="cg-overlay__hint">点击继续</span>
+        </button>
       )}
       {cgSrc && cgMode === "half" && (
-        <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
-          <div className="absolute inset-0 bg-black/40" />
+        <button
+          type="button"
+          className="cg-overlay cg-overlay--card"
+          onClick={dismissCg}
+          aria-label="继续剧情"
+        >
+          <span className="cg-overlay__scrim" />
           <img
             src={cgSrc}
             alt=""
-            className="relative max-w-[60%] max-h-[70%] object-contain rounded-md shadow-[0_20px_60px_rgba(0,0,0,0.6)] ring-1 ring-white/20"
+            className="cg-overlay__card-image"
             onError={() => {
-              useGameStore.setState({ cgSrc: null });
+              dismissCg();
             }}
           />
-        </div>
+          <span className="cg-overlay__hint">点击继续</span>
+        </button>
       )}
 
       {/* Flash overlay */}
@@ -143,10 +157,14 @@ function EffectParticles({ type }: { type: string }) {
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden z-10">
       {Array.from({ length: count }).map((_, i) => {
-        const left = Math.random() * 100;
-        const delay = Math.random() * 5;
-        const duration = type === "rain" ? 0.8 + Math.random() * 0.4 : 4 + Math.random() * 4;
-        const size = type === "rain" ? 2 : type === "snow" ? 4 + Math.random() * 4 : 8 + Math.random() * 8;
+        const seeded = (salt: number) => {
+          const value = Math.sin((i + 1) * 9283.13 + salt * 77.31) * 43758.5453;
+          return value - Math.floor(value);
+        };
+        const left = seeded(1) * 100;
+        const delay = seeded(2) * 5;
+        const duration = type === "rain" ? 0.8 + seeded(3) * 0.4 : 4 + seeded(3) * 4;
+        const size = type === "rain" ? 2 : type === "snow" ? 4 + seeded(4) * 4 : 8 + seeded(4) * 8;
 
         const style: React.CSSProperties = {
           left: `${left}%`,

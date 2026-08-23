@@ -14,9 +14,9 @@ export default function ChoiceMenu() {
   const cfg = gameData?.config?.ui?.choiceButtons;
 
   return (
-    <div className="absolute inset-0 z-30 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/40" />
-      <div className="relative z-10 flex flex-col gap-3 w-full max-w-lg px-6">
+    <div className="choice-layer" role="dialog" aria-label="请选择接下来的行动">
+      <div className="choice-scrim" />
+      <div className="choice-list">
         {choiceOptions.map((option, i) => (
           <ChoiceButton key={i} label={option.text} onClick={() => selectChoice(option)} cfg={cfg} index={i} />
         ))}
@@ -46,7 +46,7 @@ function ChoiceButton({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{ ...normal, ...(hovered ? hover : {}), animationDelay: `${index * 100}ms` }}
-      className="w-full text-base text-center backdrop-blur-md cursor-pointer transition-all duration-300 choice-stagger bg-black/60 border border-white/20 hover:bg-white/10 hover:border-white/50"
+      className="choice-btn choice-stagger"
     >
       {label}
     </button>

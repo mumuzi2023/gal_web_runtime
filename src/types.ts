@@ -55,7 +55,7 @@ export interface GameMeta {
 }
 
 export interface GameConfig {
-  /** "easy" (default): runtime auto-manages show/hide. "advanced": script controls all show/hide manually. */
+  /** "advanced" (default): script controls show/hide. "easy": keep one character on stage. */
   mode?: "easy" | "advanced";
   ui?: UiConfig;
 }
@@ -348,18 +348,30 @@ export interface BacklogEntry {
   voice?: string;
 }
 
+export interface SoundEffectEvent {
+  id: number;
+  src: string;
+}
+
 export interface SaveSlot {
   id: number;
   timestamp: number;
   sceneKey: string;
   commandIndex: number;
+  /** Remaining commands inside a conditional branch, if the save was made
+   * while that branch was playing. */
+  commandQueue?: Command[];
+  activeInlineCommand?: Command;
   variables: Record<string, number>;
   characters: VisibleCharacter[];
   background: string;
   backgroundPosition?: "left" | "center" | "right";
   bgmSrc: string;
+  /** Scenes the player has actually entered; older saves omit this field. */
+  visitedScenes?: string[];
   title: string;
   description: string;
 }
 
 export type Screen = "title" | "game" | "save" | "load" | "settings" | "backlog" | "endings" | "progress";
+export type BaseScreen = "title" | "game";

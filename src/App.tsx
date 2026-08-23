@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useGameStore } from "./store";
 import TitleScreen from "./components/TitleScreen";
 import BackgroundLayer from "./components/BackgroundLayer";
@@ -12,45 +12,28 @@ import BacklogPanel from "./components/BacklogPanel";
 import EndingsScreen from "./components/EndingsScreen";
 import ProgressPanel from "./components/ProgressPanel";
 
-// Reference design dimensions. Layout is fluid (% of the viewport), but font
-// sizes scale with `min(vw/REF_W, vh/REF_H)` so text stays readable on small
-// windows without distorting layout.
-const REF_W = 1920;
-const REF_H = 1080;
-
 export default function App() {
   const loadGameData = useGameStore((s) => s.loadGameData);
   const loading = useGameStore((s) => s.loading);
   const error = useGameStore((s) => s.error);
   const gameData = useGameStore((s) => s.gameData);
   const screen = useGameStore((s) => s.screen);
+  const overlayReturnScreen = useGameStore((s) => s.overlayReturnScreen);
+  const preloadProgress = useGameStore((s) => s.preloadProgress);
+  const preloadLabel = useGameStore((s) => s.preloadLabel);
+  const preloadFailures = useGameStore((s) => s.preloadFailures);
   const commandIndex = useGameStore((s) => s.commandIndex);
+  const commandSerial = useGameStore((s) => s.commandSerial);
+  const currentSceneKey = useGameStore((s) => s.currentSceneKey);
   const waitingForChoice = useGameStore((s) => s.waitingForChoice);
   const choiceOptions = useGameStore((s) => s.choiceOptions);
   const startNewGame = useGameStore((s) => s.startNewGame);
   const advanceCommand = useGameStore((s) => s.advanceCommand);
   const selectChoice = useGameStore((s) => s.selectChoice);
+  const finishTyping = useGameStore((s) => s.finishTyping);
+  const closeOverlay = useGameStore((s) => s.closeOverlay);
+  const toggleAutoMode = useGameStore((s) => s.toggleAutoMode);
   const studioStarted = useRef(false);
-
-  const updateFontScale = useCallback(() => {
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const scale = Math.min(vw / REF_W, vh / REF_H);
-    // 16px is the default html root font-size; multiplying it scales every
-    // Tailwind text-* class (which is rem-based) and any rem/em consumer.
-    document.documentElement.style.fontSize = `${Math.max(8, 16 * scale)}px`;
-  }, []);
-
-  useEffect(() => {
-    updateFontScale();
-    window.addEventListener("resize", updateFontScale);
-    return () => {
-      window.removeEventListener("resize", updateFontScale);
-      // Restore default so the loading/error screens render normally if the
-      // component unmounts (e.g. HMR).
-      document.documentElement.style.fontSize = "";
-    };
-  }, [updateFontScale]);
 
   useEffect(() => {
     // Get game data URL from query parameter, or auto-load game_data.json
@@ -81,39 +64,72 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [screen, commandIndex, waitingForChoice, choiceOptions, advanceCommand, selectChoice]);
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (event.repeat || target?.closest("button, input, select, textarea, [contenteditable='true']")) return;
+      if (screen !== "game") {
+        if (event.key === "Escape") closeOverlay();
+        return;
+      }
+      if (waitingForChoice) return;
+      if ([" ", "Enter", "ArrowRight"].includes(event.key)) {
+        event.preventDefault();
+        const state = useGameStore.getState();
+        if (state.isTyping) finishTyping();
+        else if (state.waitingForClick) advanceCommand();
+      } else if (event.key.toLowerCase() === "a") {
+        toggleAutoMode();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [advanceCommand, closeOverlay, finishTyping, screen, toggleAutoMode, waitingForChoice]);
+
   if (loading || (!gameData && !error)) {
     return (
-      <div className="h-full flex items-center justify-center bg-black">
-        <div className="text-white/60 text-lg animate-pulse">加载中...</div>
+      <div className="runtime-loading">
+        <div className="runtime-loading__glow" />
+        <div className="runtime-loading__panel">
+          <div className="runtime-loading__eyebrow">STORYFORGE RUNTIME</div>
+          <div className="runtime-loading__title">正在准备故事</div>
+          <div className="runtime-loading__track">
+            <span style={{ width: `${Math.max(6, preloadProgress * 100)}%` }} />
+          </div>
+          <div className="runtime-loading__status">{preloadLabel || "读取游戏数据…"}</div>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="h-full flex items-center justify-center bg-black">
-        <div className="text-center">
-          <div className="text-red-400 text-lg mb-2">加载失败</div>
-          <div className="text-white/40 text-sm">{error}</div>
+      <div className="runtime-loading">
+        <div className="runtime-error-card">
+          <div className="runtime-error-card__icon">!</div>
+          <div className="runtime-error-card__title">故事载入失败</div>
+          <div className="runtime-error-card__detail">{error}</div>
+          <button onClick={() => window.location.reload()}>重新加载</button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 bg-black overflow-hidden">
-      <div className="absolute inset-0 overflow-hidden select-none">
+    <main className="runtime-shell">
+      <div className="runtime-stage select-none">
       {/* Audio manager (invisible) */}
       <AudioManager />
 
-      {/* Title screen */}
-      {screen === "title" && <TitleScreen />}
+      {/* Keep the base scene mounted below modal screens. This prevents black
+          flashes and lets BGM continue while settings/backlog are open. */}
+      {(screen === "title" || (screen !== "game" && overlayReturnScreen === "title")) && <TitleScreen />}
 
       {/* Game screen */}
-      {screen === "game" && (
+      {(screen === "game" || (screen !== "title" && overlayReturnScreen === "game")) && (
         <>
           <BackgroundLayer />
-          <DialogBox />
+          <DialogBox key={`${currentSceneKey}:${commandIndex}:${commandSerial}`} />
           <ChoiceMenu />
           <ChapterTitle />
         </>
@@ -125,7 +141,13 @@ export default function App() {
       <BacklogPanel />
       <EndingsScreen />
       <ProgressPanel />
+
+      {preloadFailures.length > 0 && screen !== "title" && (
+        <div className="asset-warning" title={`${preloadFailures.length} 个资源未能预载`}>
+          <span>!</span> {preloadFailures.length} 个资源不可用
+        </div>
+      )}
       </div>
-    </div>
+    </main>
   );
 }

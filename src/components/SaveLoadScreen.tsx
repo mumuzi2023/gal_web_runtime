@@ -1,22 +1,16 @@
-import { useGameStore, resolveOverlayBackground } from "../store";
-import { panelOverlayStyle, defaultLightPanel } from "../uiConfig";
+import { useGameStore } from "../store";
 
 export default function SaveLoadScreen() {
   const screen = useGameStore((s) => s.screen);
-  const setScreen = useGameStore((s) => s.setScreen);
+  const closeOverlay = useGameStore((s) => s.closeOverlay);
   const saves = useGameStore((s) => s.saves);
   const saveGame = useGameStore((s) => s.saveGame);
   const loadGame = useGameStore((s) => s.loadGame);
-  const background = useGameStore((s) => s.background);
   const gameData = useGameStore((s) => s.gameData);
 
   if (screen !== "save" && screen !== "load") return null;
 
   const isSave = screen === "save";
-  const panelCfg = gameData?.config?.ui?.saveLoadPanel;
-  const overlayCss = panelOverlayStyle(panelCfg, defaultLightPanel);
-  const bgUrl = resolveOverlayBackground(background, gameData);
-
   const handleSlotClick = (slotId: number) => {
     if (isSave) {
       saveGame(slotId);
@@ -43,36 +37,31 @@ export default function SaveLoadScreen() {
   };
 
   return (
-    <div className="absolute inset-0 z-50 flex flex-col items-center">
-      {bgUrl && (
-        <img src={bgUrl} alt="" className="absolute inset-0 w-full h-full object-cover" onError={(e)=>{(e.target as HTMLImageElement).style.display='none';}} />
-      )}
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" style={overlayCss} />
+    <div className="runtime-overlay" role="dialog" aria-modal="true" aria-labelledby="save-load-title">
+      <div className="runtime-overlay__scrim" />
+      <section className="runtime-overlay__surface save-load-surface">
+        <header className="runtime-overlay__header">
+          <div>
+            <h2 id="save-load-title" className="runtime-overlay__title">{isSave ? "保存进度" : "读取进度"}</h2>
+            <div className="runtime-overlay__subtitle">{isSave ? "选择一个位置保存当前场景" : "从已有记录继续故事"}</div>
+          </div>
+          <button onClick={closeOverlay} className="runtime-overlay__close" aria-label="关闭">✕</button>
+        </header>
 
-      <div className="relative w-full max-w-4xl px-6 py-8 h-full flex flex-col">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold text-white/90">{isSave ? "存档" : "读档"}</h2>
-          <button onClick={() => setScreen("game")} className="text-white/50 hover:text-white/90 transition text-sm cursor-pointer">
-            ✕ 关闭
-          </button>
-        </div>
-
-        {/* Grid — 2 cols mobile, 4 cols desktop */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 flex-1 overflow-y-auto backlog-scroll">
+        <div className="runtime-overlay__body save-slot-grid backlog-scroll">
           {saves.map((slot, i) => (
             <button
               key={i}
               onClick={() => handleSlotClick(i)}
-              className={`text-left rounded-lg transition overflow-hidden flex flex-col ${
+              className={`save-slot ${
                 slot
-                  ? "bg-black/50 border border-white/15 hover:border-white/40 hover:bg-black/60"
-                  : "bg-black/30 border border-dashed border-white/10 hover:border-white/30"
-              } ${!slot && !isSave ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
+                  ? "save-slot--filled"
+                  : "save-slot--empty"
+              } ${!slot && !isSave ? "save-slot--disabled" : ""}`}
               disabled={!slot && !isSave}
             >
               {/* Thumbnail area */}
-              <div className="relative w-full h-20 bg-black/40 overflow-hidden">
+              <div className="save-slot__preview">
                 {slot?.background ? (
                   <>
                     <img
@@ -113,30 +102,30 @@ export default function SaveLoadScreen() {
               </div>
 
               {/* Slot info */}
-              <div className="p-2.5 flex-1">
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-white/70 text-xs font-medium">No.{i + 1}</span>
+              <div className="save-slot__info">
+                <div className="save-slot__meta">
+                  <span>No.{i + 1}</span>
                   {slot && (
-                    <span className="text-white/40 text-[10px]">
+                    <time>
                       {new Date(slot.timestamp).toLocaleString("zh-CN", {
                         month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
                       })}
-                    </span>
+                    </time>
                   )}
                 </div>
                 {slot ? (
                   <div>
-                    <div className="text-white/50 text-[11px] truncate">{slot.sceneKey}</div>
-                    <div className="text-white/30 text-[10px] truncate mt-0.5">{slot.description}</div>
+                    <div className="save-slot__scene">{slot.title || slot.sceneKey}</div>
+                    <div className="save-slot__description">{slot.description || "已保存的剧情位置"}</div>
                   </div>
                 ) : (
-                  <div className="text-white/20 text-[11px]">— 空 —</div>
+                  <div className="save-slot__empty-label">空位置</div>
                 )}
               </div>
             </button>
           ))}
         </div>
-      </div>
+      </section>
     </div>
   );
 }

@@ -4,7 +4,6 @@ import {
   buttonStyle,
   buttonHoverStyle,
   defaultTitleButton,
-  titleLayoutClass,
 } from "../uiConfig";
 import type { UiButtonStyle } from "../types";
 
@@ -19,10 +18,11 @@ export default function TitleScreen() {
   const hasSaves = saves.some((s) => s !== null);
   const meta = gameData.meta;
   const titleCfg = gameData.config?.ui?.title;
-  const layoutCls = titleLayoutClass(titleCfg?.layout);
+  const layout = titleCfg?.layout || "left";
 
-  const firstScene = Object.values(gameData.scenes)[0];
-  const titleBg = firstScene?.background || "";
+  const firstKey = gameData.start_scene || gameData.scene_order?.[0] || Object.keys(gameData.scenes)[0];
+  const rawTitleBg = firstKey ? gameData.scenes[firstKey]?.background || "" : "";
+  const titleBg = gameData._asset_manifest?.[rawTitleBg] || rawTitleBg;
 
   const baseBtn: UiButtonStyle | undefined = titleCfg?.buttons;
   const overrides = titleCfg?.buttonOverrides || {};
@@ -35,60 +35,58 @@ export default function TitleScreen() {
   ];
 
   return (
-    <div className={`absolute inset-0 flex flex-col title-fade-in ${layoutCls}`}>
+    <section className={`title-screen title-screen--${layout} title-fade-in`}>
+      <div className="title-screen__fallback" aria-hidden="true" />
       {titleBg && (
         <img
           src={titleBg}
           alt=""
-          className="absolute inset-0 w-full h-full object-cover"
+          className="title-screen__background"
           onError={(e) => {
             (e.target as HTMLImageElement).style.display = "none";
           }}
         />
       )}
-      <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/10 to-black/60" />
+      <div className="title-screen__veil" />
 
-      {/* Title — upper 1/3 of screen */}
-      <div className="relative z-10 text-center mt-[12vh] mb-auto">
+      <div className="title-screen__content">
+        <div className="title-screen__kicker">INTERACTIVE STORY</div>
         <h1
-          className="text-5xl font-bold tracking-widest mb-4"
+          className="title-screen__heading"
           style={{
             color: titleCfg?.titleColor || "#fff",
-            textShadow: "0 2px 20px rgba(0,0,0,0.7), 0 0 40px rgba(0,0,0,0.3)",
           }}
         >
           {meta.title}
         </h1>
         {meta.description && (
           <p
-            className="text-sm max-w-md mx-auto leading-relaxed line-clamp-3"
+            className="title-screen__description"
             style={{ color: titleCfg?.subtitleColor || "rgba(255,255,255,0.6)" }}
           >
-            {meta.description.slice(0, 120)}
-            {meta.description.length > 120 ? "..." : ""}
+            {meta.description}
           </p>
         )}
+
+        <nav className="title-screen__menu" aria-label="标题菜单">
+          {buttons
+            .filter((b) => b.show)
+            .map((b) => (
+              <MenuButton
+                key={b.key}
+                label={b.label}
+                onClick={b.onClick}
+                override={overrides[b.key]}
+                base={baseBtn}
+              />
+            ))}
+        </nav>
       </div>
 
-      {/* Buttons — lower 1/3, vertical stack, centered */}
-      <div className="relative z-10 flex flex-col gap-3 items-center mb-[12vh]">
-        {buttons
-          .filter((b) => b.show)
-          .map((b) => (
-            <MenuButton
-              key={b.key}
-              label={b.label}
-              onClick={b.onClick}
-              override={overrides[b.key]}
-              base={baseBtn}
-            />
-          ))}
-      </div>
-
-      <div className="absolute bottom-4 right-4 text-white/30 text-xs">
+      <div className="title-screen__footer">
         v{meta.version} | {meta.author}
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -114,7 +112,7 @@ function MenuButton({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{ ...normal, ...(hovered ? hover : {}) }}
-      className="text-lg tracking-wider backdrop-blur-sm transition-all duration-300 cursor-pointer bg-black/40 border border-white/20 hover:bg-white/10 hover:border-white/40"
+      className="title-menu-button text-lg tracking-wider"
     >
       {labelText}
     </button>

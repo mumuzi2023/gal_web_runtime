@@ -2,7 +2,7 @@
 
 纯静态 Web 视觉小说播放器。Runtime 不负责内容生成，只加载 `game_data.json`，在浏览器内解释剧情命令、渲染画面并维护本地存档。
 
-> 当前状态：功能开发中。2026-08-11 已同步章节类型并恢复生产构建；React 19 lint 错误仍待处理。
+> 当前状态：功能开发中。2026-08-23 已完成资源预载、响应式布局、声音事件和玩家流程图整改；生产构建与 lint 均通过。
 
 ## 技术栈
 
@@ -34,23 +34,25 @@ URL ?data=<game_data.json>
 | `src/types.ts` | GameData、18 类 Command 和运行时状态类型 |
 | `src/store.ts` | 数据加载、命令解释器、导航、存档和设置 |
 | `src/engine.ts` | 条件表达式和变量修改 |
-| `src/preloader.ts` | 全量与下一场景图片预加载 |
+| `src/preloader.ts` | 首章关键资源、下一分支和全局后台预加载 |
 | `src/uiConfig.ts` | UI 默认值和配置合并 |
-| `src/App.tsx` | 数据 URL、屏幕路由和全局缩放 |
+| `src/App.tsx` | 数据 URL、基础画面/模态路由和键盘控制 |
 | `src/components/*` | 播放画面和覆盖面板 |
 
 ## 当前功能
 
 - 对话、旁白、打字机和自动播放
-- 角色表情、左右/中间位置和说话者高亮
+- 角色表情、七档横向位置、多角色同屏和说话者高亮
 - 背景、全屏/半屏 CG
-- BGM、角色语音和 SE
-- 条件选项、变量、跳转和结局
+- 连续 BGM、可重播角色语音和不会被批处理丢失的 SE 事件队列
+- 条件选项、变量、条件命令队列、跳转和结局
 - 20 个 localStorage 存档位及缩略图
-- 对话回看、设置、结局和进度面板
+- 对话与语音回看、设置、结局和只读剧情路线图
 - 章节标题、震动、闪屏、雨、雪和樱花效果
 - `config.ui` 自定义标题页、按钮、对话框、名牌和面板
-- 图片清单预加载与下一场景预加载
+- 启动首章图片/音频预载、真实分支的渐进预载与失败提示
+- 动态视口、安全区、手机竖屏和小尺寸横屏布局
+- 流程图自动适应、拖拽、滚轮/双指缩放和章节详情
 
 ## 本地运行
 
@@ -74,8 +76,9 @@ npm run build
 
 当前检查结果：
 
-- `npm run build`：通过。`GameData` 已声明进度图使用的 `chapters` 和 `side_chapters`。
-- `npm run lint`：失败。主要是粒子渲染期 `Math.random()`、DialogBox effect 内同步 setState，以及若干 hook dependency 警告。
+- `npm run build`：通过。生产产物默认使用 `./` 相对基址，可放入 ZIP 或任意子目录。
+- `npm run lint`：通过。
+- 无头 Chromium：通过 1440×900 与 390×844 的完整交互回归。
 
 ## GameData 边界
 
@@ -127,7 +130,7 @@ Generator 提供 `chapters` 和 `side_chapters` 给进度图使用，TypeScript 
 
 运行时按以下顺序解析图片：
 
-1. 已是 `http` URL：直接使用。
+1. 已是 `http`、`data` 或 `blob` URL：直接使用。
 2. `_asset_manifest[path]` 存在：使用清单映射。
 3. 否则保留原始相对路径。
 
@@ -137,7 +140,7 @@ Generator 提供 `chapters` 和 `side_chapters` 给进度图使用，TypeScript 
 
 - 游戏状态集中在 Zustand store。
 - 存档、设置和已达成结局保存在 localStorage。
-- 每个存档记录 scene、command index、variables、可见角色、背景和 BGM。
+- 每个存档记录 scene、command index、条件分支队列、已访问场景、variables、可见角色、背景和 BGM。
 - 条件表达式支持比较运算以及 `and/or/not`。
 
 ## 与 Generator 的关系
@@ -153,7 +156,9 @@ gal_generator
 
 ## 部署
 
-仓库包含 GitHub Pages workflow。推送 `main` 后由 Actions 构建并部署静态产物。当前 build 通过；部署前仍建议修复 React lint 错误。
+仓库包含 GitHub Pages workflow。推送 `main` 后由 Actions 构建并部署静态产物。Generator 的离线导出与 GitHub 发布会校验资源下载和清单完整性，不再发布静默缺图/缺音频的包。
+
+完整审计清单见 [`docs/runtime-audit-2026-08.md`](docs/runtime-audit-2026-08.md)。
 
 ## License
 
