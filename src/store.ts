@@ -11,6 +11,7 @@ import type {
   BaseScreen,
 } from "./types";
 import { evaluateCondition, applySet } from "./engine";
+import { resolveAssetUrl } from "./assets";
 import {
   collectImageUrls,
   getStartSceneKey,
@@ -25,13 +26,7 @@ const MAX_SLOTS = 20;
 
 /** Resolve a relative asset path using the _asset_manifest */
 function resolveUrl(path: string | undefined, manifest: Record<string, string> | undefined): string {
-  if (!path) return "";
-  if (/^(https?:|data:|blob:)/i.test(path)) return path;
-  if (manifest) {
-    const resolved = manifest[path];
-    if (resolved) return resolved;
-  }
-  return path;
+  return resolveAssetUrl(path, manifest);
 }
 
 /** Pick a usable background URL, falling back to the first scene's bg
@@ -51,6 +46,8 @@ export function resolveOverlayBackground(
 }
 
 export interface GameSettings {
+  /** project follows the creator-defined default; light/dark are player overrides. */
+  appearance: "project" | "light" | "dark";
   textSpeed: number;       // chars per second (10-100)
   autoSpeed: number;       // seconds per message in auto mode (1-10)
   bgmVolume: number;       // 0-1
@@ -60,6 +57,7 @@ export interface GameSettings {
 }
 
 const defaultSettings: GameSettings = {
+  appearance: "project",
   textSpeed: 40,
   autoSpeed: 3,
   bgmVolume: 0.5,
@@ -165,7 +163,16 @@ export const useGameStore = create<GameState>((set, get) => {
   const loadSettings = (): GameSettings => {
     try {
       const raw = localStorage.getItem(SETTINGS_KEY);
-      if (raw) return { ...defaultSettings, ...JSON.parse(raw) };
+      if (raw) {
+        const persisted = JSON.parse(raw) as Partial<GameSettings>;
+        return {
+          ...defaultSettings,
+          ...persisted,
+          appearance: ["project", "light", "dark"].includes(String(persisted.appearance))
+            ? persisted.appearance as GameSettings["appearance"]
+            : "project",
+        };
+      }
     } catch { /* ignore */ }
     return { ...defaultSettings };
   };
@@ -198,6 +205,16 @@ export const useGameStore = create<GameState>((set, get) => {
     return scene.commands[index];
   };
 
+  /** Passive commands normally advance immediately. In the embedded Studio
+   * preview the selected command is a stable inspection point, so stop the
+   * automatic chain exactly on that command instead of overshooting it. */
+  const advancePassiveCommand = () => {
+    const params = new URLSearchParams(window.location.search);
+    const studioTarget = Math.max(0, Number(params.get("command") || 0));
+    if (params.get("studio") === "1" && get().commandIndex >= studioTarget) return;
+    get().advanceCommand();
+  };
+
   const executeCommand = (cmd: Command) => {
     set((current) => ({ commandSerial: current.commandSerial + 1 }));
     const state = get();
@@ -210,7 +227,7 @@ export const useGameStore = create<GameState>((set, get) => {
           background: resolveUrl(cmd.src, data._asset_manifest),
           backgroundPosition: cmd.position || "center",
         });
-        get().advanceCommand();
+        advancePassiveCommand();
         break;
       }
 
@@ -254,7 +271,7 @@ export const useGameStore = create<GameState>((set, get) => {
             }));
           }, 500);
         }
-        get().advanceCommand();
+        advancePassiveCommand();
         break;
       }
 
@@ -262,7 +279,7 @@ export const useGameStore = create<GameState>((set, get) => {
         set((s) => ({
           visibleCharacters: s.visibleCharacters.filter((c) => c.key !== cmd.character),
         }));
-        get().advanceCommand();
+        advancePassiveCommand();
         break;
       }
 
@@ -367,7 +384,7 @@ export const useGameStore = create<GameState>((set, get) => {
 
       case "bgm": {
         set({ bgmSrc: resolveUrl(cmd.src, data._asset_manifest) });
-        get().advanceCommand();
+        advancePassiveCommand();
         break;
       }
 
@@ -381,7 +398,7 @@ export const useGameStore = create<GameState>((set, get) => {
           // into a single React render. AudioManager consumes every new id.
           soundEffects: [...state.soundEffects, { id: eventId, src }].slice(-32),
         });
-        get().advanceCommand();
+        advancePassiveCommand();
         break;
       }
 
@@ -410,7 +427,7 @@ export const useGameStore = create<GameState>((set, get) => {
             ),
           }));
         }
-        get().advanceCommand();
+        advancePassiveCommand();
         break;
       }
 
@@ -429,11 +446,17 @@ export const useGameStore = create<GameState>((set, get) => {
             return;
           }
         }
-        get().advanceCommand();
+        advancePassiveCommand();
         break;
       }
 
       case "wait": {
+        const params = new URLSearchParams(window.location.search);
+        const studioTarget = Math.max(0, Number(params.get("command") || 0));
+        if (params.get("studio") === "1") {
+          if (get().commandIndex < studioTarget) advancePassiveCommand();
+          break;
+        }
         const duration = cmd.duration || 1000;
         const serial = get().commandSerial;
         setTimeout(() => {
@@ -445,21 +468,21 @@ export const useGameStore = create<GameState>((set, get) => {
       case "shake": {
         set({ shaking: true });
         setTimeout(() => set({ shaking: false }), cmd.duration || 400);
-        get().advanceCommand();
+        advancePassiveCommand();
         break;
       }
 
       case "flash": {
         set({ flashing: true, flashColor: cmd.color || "#fff" });
         setTimeout(() => set({ flashing: false }), cmd.duration || 600);
-        get().advanceCommand();
+        advancePassiveCommand();
         break;
       }
 
       case "effect": {
         // Effect types: sakura, rain, snow, dark etc.
         set({ effectType: cmd.enable ? (cmd.name || cmd.type) : null });
-        get().advanceCommand();
+        advancePassiveCommand();
         break;
       }
 
@@ -469,7 +492,7 @@ export const useGameStore = create<GameState>((set, get) => {
         // with a broken-image inside, which players experience as "the screen
         // suddenly went black mid-click".
         if (!resolved) {
-          get().advanceCommand();
+          advancePassiveCommand();
           break;
         }
         set({
@@ -488,10 +511,13 @@ export const useGameStore = create<GameState>((set, get) => {
           chapterTitle: cmd.text,
           chapterSubtitle: cmd.subtitle || "",
         });
-        const serial = get().commandSerial;
-        setTimeout(() => {
-          if (get().commandSerial === serial) get().dismissChapterTitle();
-        }, 3000);
+        const params = new URLSearchParams(window.location.search);
+        if (params.get("studio") !== "1") {
+          const serial = get().commandSerial;
+          setTimeout(() => {
+            if (get().commandSerial === serial) get().dismissChapterTitle();
+          }, 3000);
+        }
         break;
       }
 
@@ -537,7 +563,7 @@ export const useGameStore = create<GameState>((set, get) => {
         if (typeof anyCmd.enable === "boolean") {
           set({ effectType: anyCmd.enable ? String(anyCmd.type) : null });
         }
-        get().advanceCommand();
+        advancePassiveCommand();
         break;
       }
     }

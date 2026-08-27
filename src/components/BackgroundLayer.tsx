@@ -1,4 +1,5 @@
 import { useGameStore } from "../store";
+import { resolveAssetUrl } from "../assets";
 
 const positionPercent: Record<string, number> = {
   "far-left": 10,
@@ -36,9 +37,7 @@ export default function BackgroundLayer() {
       expressions["normal"] ||
       Object.values(expressions)[0] ||
       "";
-    if (!raw) return "";
-    if (raw.startsWith("http")) return raw;
-    return manifest?.[raw] || raw;
+    return resolveAssetUrl(raw, manifest);
   };
 
   return (

@@ -3,6 +3,8 @@
 export interface GameData {
   meta: GameMeta;
   config: GameConfig;
+  /** Generator persists creator-owned UI here; config.ui remains accepted for older packages. */
+  ui?: UiConfig;
   characters: Record<string, CharacterDef>;
   scenes: Record<string, SceneDef>;
   variables: Record<string, string | number | boolean>;
@@ -62,6 +64,112 @@ export interface GameConfig {
 
 /* ── UI customization (all fields optional, fall back to defaults) ── */
 
+export type UiThemeMode = "light" | "dark";
+export type UiSkinFit = "cover" | "contain" | "stretch" | "tile" | "nine-slice";
+
+export interface UiInsets {
+  top?: number;
+  right?: number;
+  bottom?: number;
+  left?: number;
+}
+
+/** A generated or uploaded skin can use different artwork on wide and narrow screens. */
+export interface UiResponsiveSkin {
+  desktop?: string;
+  mobile?: string;
+  fit?: UiSkinFit;
+  position?: string;
+  opacity?: number;
+  /** Pixel borders used by CSS border-image when fit is nine-slice. */
+  nineSlice?: UiInsets & { fill?: boolean };
+  /** CSS pixel widths used to render the source nine-slice borders. */
+  borderWidth?: UiInsets;
+  /**
+   * Pixels by which a nine-slice border is expanded towards the outside.
+   * This compensates for decorative transparent margins in authored frames.
+   */
+  outset?: UiInsets;
+  /** Content-safe inset authored together with the artwork. */
+  safeArea?: UiInsets;
+  sourcePrompt?: string;
+  cutout?: "none" | "alpha" | "white-key" | "flat-frame" | "center-icon" | "ai";
+}
+
+export interface UiFontSystem {
+  body?: string;
+  display?: string;
+  dialogue?: string;
+  ui?: string;
+  baseSize?: string;
+  scale?: number;
+  captionSize?: string;
+  uiSize?: string;
+  bodySize?: string;
+  headingSize?: string;
+  displaySize?: string;
+}
+
+export interface UiSemanticColors {
+  accent?: string;
+  accentStrong?: string;
+  page?: string;
+  pageRaised?: string;
+  surface?: string;
+  surfaceRaised?: string;
+  line?: string;
+  controlLine?: string;
+  textPrimary?: string;
+  textSecondary?: string;
+  textMuted?: string;
+  titleText?: string;
+  titleSecondary?: string;
+  success?: string;
+  warning?: string;
+  danger?: string;
+  common?: string;
+  route?: string;
+  ending?: string;
+  side?: string;
+  locked?: string;
+}
+
+export interface UiRadiusSystem {
+  small?: string;
+  medium?: string;
+  large?: string;
+  panel?: string;
+  pill?: string;
+}
+
+export interface UiShadowSystem {
+  small?: string;
+  panel?: string;
+  elevated?: string;
+}
+
+export interface UiGlobalConfig {
+  /** Project default; the player can still select another mode in Settings. */
+  defaultTheme?: UiThemeMode;
+  allowPlayerThemeChoice?: boolean;
+  fonts?: UiFontSystem;
+  colors?: UiSemanticColors;
+  radii?: UiRadiusSystem;
+  shadows?: UiShadowSystem;
+}
+
+export interface UiToolbarLayout {
+  anchor?: "top-right" | "top-left" | "above-right" | "bottom-right" | "right-vertical" | "custom";
+  top?: string;
+  right?: string;
+  bottom?: string;
+  left?: string;
+  width?: string;
+  gap?: string;
+  direction?: "row" | "column";
+  justify?: "start" | "center" | "end" | "space-between";
+}
+
 export interface UiButtonStyle {
   background?: string;            // CSS color (rgba/hex)
   backgroundImage?: string;       // url(...) or full url to image
@@ -77,8 +185,18 @@ export interface UiButtonStyle {
   padding?: string;
   shadow?: string;                // CSS box-shadow value
   width?: string;
+  height?: string;
   /** Optional small icon shown to the left of the label (url or emoji). */
   icon?: string;
+  /** Optional per-button label override. */
+  label?: string;
+  /** Hide the visible label while keeping its accessible name and tooltip. */
+  showLabel?: boolean;
+  tooltip?: string;
+  hidden?: boolean;
+  /** Used by the in-game quick-menu base style to place the button group. */
+  toolbar?: UiToolbarLayout;
+  skin?: UiResponsiveSkin;
 }
 
 export interface UiPanelStyle {
@@ -94,6 +212,7 @@ export interface UiPanelStyle {
   /** Color overlay drawn on top of the page-level background image. */
   overlay?: string;
   padding?: string;
+  skin?: UiResponsiveSkin;
 }
 
 export interface UiTextboxStyle {
@@ -109,11 +228,22 @@ export interface UiTextboxStyle {
   fontFamily?: string;
   fontSize?: string;
   shadow?: string;
+  padding?: string;
+  width?: string;
+  height?: string;
+  minHeight?: string;
+  /** Distance from the bottom edge of the game viewport. */
+  bottom?: string;
+  /** Horizontal offset from the centered position. */
+  offsetX?: string;
+  skin?: UiResponsiveSkin;
 }
 
 export interface UiNameplateStyle {
   style?: string;                 // legacy
   position?: string;              // legacy ("top-left" etc.)
+  /** Semantic attachment point used by the UI designer; custom keeps explicit offsets. */
+  anchor?: "top-left" | "top-center" | "top-right" | "inside-left" | "inside-right" | "custom";
   background?: string;
   borderColor?: string;
   borderWidth?: string;
@@ -122,6 +252,17 @@ export interface UiNameplateStyle {
   textColor?: string;
   fontFamily?: string;
   fontWeight?: string | number;
+  backgroundImage?: string;
+  padding?: string;
+  top?: string;
+  right?: string;
+  bottom?: string;
+  left?: string;
+  width?: string;
+  height?: string;
+  minWidth?: string;
+  maxWidth?: string;
+  skin?: UiResponsiveSkin;
 }
 
 export interface UiTitleConfig {
@@ -132,9 +273,98 @@ export interface UiTitleConfig {
   buttons?: UiButtonStyle;
   /** Per-button override keyed by action: newGame|continue|settings|endings */
   buttonOverrides?: Record<string, UiButtonStyle>;
+  /** Dedicated title artwork; no longer forced to the first story background. */
+  background?: UiResponsiveSkin;
+  veil?: string;
+  kicker?: string;
+}
+
+export interface UiGamePageConfig {
+  textbox?: UiTextboxStyle;
+  nameplate?: UiNameplateStyle;
+  menuButtons?: UiButtonStyle;
+  menuButtonOverrides?: Record<string, UiButtonStyle>;
+  choiceButtons?: UiButtonStyle;
+}
+
+export interface UiPanelPageConfig {
+  surface?: UiPanelStyle;
+  pageBackground?: UiResponsiveSkin;
+}
+
+export interface UiSaveLoadPageConfig extends UiPanelPageConfig {
+  slot?: UiPanelStyle;
+  desktopColumns?: number;
+  mobileColumns?: number;
+  thumbnailRatio?: string;
+}
+
+export interface UiBacklogPageConfig extends UiPanelPageConfig {
+  entry?: UiPanelStyle;
+}
+
+export interface UiEndingsPageConfig extends UiPanelPageConfig {
+  card?: UiPanelStyle;
+  reachedAccent?: string;
+  lockedAccent?: string;
+}
+
+export type UiFlowNodeShape = "rounded-rect" | "rect" | "pill" | "diamond";
+export type UiFlowEdgeCurve = "smooth" | "straight" | "step";
+
+export interface UiFlowNodeStyle {
+  shape?: UiFlowNodeShape;
+  width?: number;
+  height?: number;
+  radius?: number;
+  background?: string;
+  borderColor?: string;
+  textColor?: string;
+  commonColor?: string;
+  routeColor?: string;
+  endingColor?: string;
+  sideColor?: string;
+  lockedColor?: string;
+  skin?: UiResponsiveSkin;
+}
+
+export interface UiFlowEdgeStyle {
+  curve?: UiFlowEdgeCurve;
+  line?: "solid" | "dashed";
+  width?: number;
+  color?: string;
+  choiceColor?: string;
+  arrow?: "arrow" | "dot" | "none";
+}
+
+export interface UiFlowPageConfig extends UiPanelPageConfig {
+  canvasBackground?: string;
+  node?: UiFlowNodeStyle;
+  edge?: UiFlowEdgeStyle;
+}
+
+export interface UiSystemPageConfig {
+  loading?: UiPanelStyle;
+  error?: UiPanelStyle;
+  chapterCard?: UiPanelStyle;
+}
+
+export interface UiPageConfig {
+  title?: UiTitleConfig;
+  game?: UiGamePageConfig;
+  saveLoad?: UiSaveLoadPageConfig;
+  backlog?: UiBacklogPageConfig;
+  endings?: UiEndingsPageConfig;
+  flow?: UiFlowPageConfig;
+  settings?: UiPanelPageConfig;
+  system?: UiSystemPageConfig;
 }
 
 export interface UiConfig {
+  schemaVersion?: 2;
+  global?: UiGlobalConfig;
+  pages?: UiPageConfig;
+  /** Legacy flat keys remain readable so existing projects do not change appearance. */
   textbox?: UiTextboxStyle;
   nameplate?: UiNameplateStyle;
   title?: UiTitleConfig;
@@ -215,6 +445,7 @@ export interface ShowCommand extends BaseCommand {
   expression?: string;
   outfit_id?: string;
   position?: string;
+  anchor?: "top-left" | "top-center" | "top-right" | "inside-left" | "inside-right" | "custom";
   transition?: string;
 }
 

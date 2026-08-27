@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useGameStore } from "./store";
 import TitleScreen from "./components/TitleScreen";
 import BackgroundLayer from "./components/BackgroundLayer";
@@ -11,8 +11,11 @@ import SaveLoadScreen from "./components/SaveLoadScreen";
 import BacklogPanel from "./components/BacklogPanel";
 import EndingsScreen from "./components/EndingsScreen";
 import ProgressPanel from "./components/ProgressPanel";
+import { globalThemeStyle, panelStyle } from "./uiConfig";
+import type { Screen, UiConfig } from "./types";
 
 export default function App() {
+  const isStudio = new URLSearchParams(window.location.search).get("studio") === "1";
   const loadGameData = useGameStore((s) => s.loadGameData);
   const loading = useGameStore((s) => s.loading);
   const error = useGameStore((s) => s.error);
@@ -24,16 +27,30 @@ export default function App() {
   const preloadFailures = useGameStore((s) => s.preloadFailures);
   const commandIndex = useGameStore((s) => s.commandIndex);
   const commandSerial = useGameStore((s) => s.commandSerial);
+  const isTyping = useGameStore((s) => s.isTyping);
   const currentSceneKey = useGameStore((s) => s.currentSceneKey);
   const waitingForChoice = useGameStore((s) => s.waitingForChoice);
   const choiceOptions = useGameStore((s) => s.choiceOptions);
+  const showChapterTitle = useGameStore((s) => s.showChapterTitle);
+  const cgSrc = useGameStore((s) => s.cgSrc);
   const startNewGame = useGameStore((s) => s.startNewGame);
   const advanceCommand = useGameStore((s) => s.advanceCommand);
   const selectChoice = useGameStore((s) => s.selectChoice);
+  const dismissChapterTitle = useGameStore((s) => s.dismissChapterTitle);
+  const dismissCg = useGameStore((s) => s.dismissCg);
   const finishTyping = useGameStore((s) => s.finishTyping);
   const closeOverlay = useGameStore((s) => s.closeOverlay);
   const toggleAutoMode = useGameStore((s) => s.toggleAutoMode);
+  const appearance = useGameStore((s) => s.settings.appearance);
   const studioStarted = useRef(false);
+  const [studioInteractive, setStudioInteractive] = useState(false);
+  const [studioSystemPreview, setStudioSystemPreview] = useState<string>();
+  const runtimeUi = gameData?.ui || gameData?.config?.ui;
+  const projectTheme = runtimeUi?.global?.defaultTheme || "light";
+  const resolvedAppearance = appearance === "project" ? projectTheme : appearance;
+  const globalCss = globalThemeStyle(runtimeUi?.global);
+  const loadingCss = panelStyle(runtimeUi?.pages?.system?.loading, {});
+  const errorCss = panelStyle(runtimeUi?.pages?.system?.error, {});
 
   useEffect(() => {
     // Get game data URL from query parameter, or auto-load game_data.json
@@ -56,16 +73,29 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     if (params.get("studio") !== "1" || screen !== "game") return;
     const target = Math.max(0, Number(params.get("command") || 0));
-    if (commandIndex >= target) return;
+    if (commandIndex >= target) {
+      const targetCommand = gameData?.scenes[currentSceneKey]?.commands[target];
+      if (targetCommand?.type !== "chapter_title" && showChapterTitle) {
+        useGameStore.setState({ showChapterTitle: false });
+      }
+      if (targetCommand?.type !== "cg" && cgSrc) {
+        useGameStore.setState({ cgSrc: null });
+      }
+      if (isTyping) finishTyping();
+      return;
+    }
     const timer = window.setTimeout(() => {
       if (waitingForChoice && choiceOptions[0]) selectChoice(choiceOptions[0]);
+      else if (showChapterTitle) dismissChapterTitle();
+      else if (cgSrc) dismissCg();
       else advanceCommand();
     }, 80);
     return () => window.clearTimeout(timer);
-  }, [screen, commandIndex, waitingForChoice, choiceOptions, advanceCommand, selectChoice]);
+  }, [screen, commandIndex, currentSceneKey, gameData, waitingForChoice, choiceOptions, showChapterTitle, cgSrc, isTyping, advanceCommand, selectChoice, dismissChapterTitle, dismissCg, finishTyping]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if (isStudio && !studioInteractive) return;
       const target = event.target instanceof Element ? event.target : null;
       if (event.repeat || target?.closest("button, input, select, textarea, [contenteditable='true']")) return;
       if (screen !== "game") {
@@ -84,13 +114,93 @@ export default function App() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [advanceCommand, closeOverlay, finishTyping, screen, toggleAutoMode, waitingForChoice]);
+  }, [advanceCommand, closeOverlay, finishTyping, isStudio, screen, studioInteractive, toggleAutoMode, waitingForChoice]);
+
+  useEffect(() => {
+    if (!isStudio || studioInteractive) return;
+    const blockRuntimeInput = (event: Event) => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    };
+    document.addEventListener("click", blockRuntimeInput, true);
+    document.addEventListener("pointerdown", blockRuntimeInput, true);
+    document.addEventListener("pointerup", blockRuntimeInput, true);
+    return () => {
+      document.removeEventListener("click", blockRuntimeInput, true);
+      document.removeEventListener("pointerdown", blockRuntimeInput, true);
+      document.removeEventListener("pointerup", blockRuntimeInput, true);
+    };
+  }, [isStudio, studioInteractive]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("studio") !== "1") return;
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin || event.data?.type !== "storyforge:ui-preview") return;
+      const ui = event.data.ui as UiConfig | undefined;
+      const target = event.data.screen as Screen | undefined;
+      const surface = event.data.surface as string | undefined;
+      const interactive = event.data.interactive === true;
+      setStudioInteractive(interactive);
+      if (!interactive) useGameStore.setState({ autoMode: false });
+      if (ui) {
+        useGameStore.setState((state) => state.gameData ? {
+          gameData: {
+            ...state.gameData,
+            ui,
+            config: { ...(state.gameData.config || {}), ui },
+          },
+        } : state);
+      }
+      if (target) useGameStore.getState().setScreen(target);
+      if (target === "game" && !surface) {
+        useGameStore.setState({
+          screen: "game",
+          overlayReturnScreen: "game",
+          currentText: "雨停之后，站台尽头传来一声并不存在的汽笛。",
+          currentCharacter: "顾遥",
+          currentCharacterColor: "var(--runtime-accent)",
+          waitingForClick: true,
+          waitingForChoice: false,
+          isTyping: false,
+          showChapterTitle: false,
+        });
+      }
+      setStudioSystemPreview(surface === "loading" || surface === "error" ? surface : undefined);
+      if (surface === "chapterCard") {
+        useGameStore.setState({
+          showChapterTitle: true,
+          chapterTitle: "第三章 · 潮声抵达之前",
+          chapterSubtitle: "在分岔的夜晚，所有选择都有了回声",
+        });
+      } else {
+        useGameStore.setState({ showChapterTitle: false });
+      }
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("studio") !== "1" || !gameData || !studioStarted.current) return;
+    // A preview target received before loadGameData finishes can be replaced
+    // by startNewGame(). Announce readiness only after that initialization so
+    // the Studio resends the authoritative draft and target screen.
+    const timer = window.setTimeout(() => {
+      window.parent.postMessage(
+        { type: "storyforge:ui-preview-ready" },
+        window.location.origin,
+      );
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [gameData]);
 
   if (loading || (!gameData && !error)) {
     return (
-      <div className="runtime-loading">
+      <div className="runtime-loading" data-runtime-theme={resolvedAppearance} style={globalCss}>
         <div className="runtime-loading__glow" />
-        <div className="runtime-loading__panel">
+        <div className="runtime-loading__panel ui-responsive-skin" style={loadingCss}>
           <div className="runtime-loading__eyebrow">STORYFORGE RUNTIME</div>
           <div className="runtime-loading__title">正在准备故事</div>
           <div className="runtime-loading__track">
@@ -104,8 +214,8 @@ export default function App() {
 
   if (error) {
     return (
-      <div className="runtime-loading">
-        <div className="runtime-error-card">
+      <div className="runtime-loading" data-runtime-theme={resolvedAppearance} style={globalCss}>
+        <div className="runtime-error-card ui-responsive-skin" style={errorCss}>
           <div className="runtime-error-card__icon">!</div>
           <div className="runtime-error-card__title">故事载入失败</div>
           <div className="runtime-error-card__detail">{error}</div>
@@ -116,7 +226,7 @@ export default function App() {
   }
 
   return (
-    <main className="runtime-shell">
+    <main className="runtime-shell" data-runtime-theme={resolvedAppearance} style={globalCss}>
       <div className="runtime-stage select-none">
       {/* Audio manager (invisible) */}
       <AudioManager />
@@ -145,6 +255,27 @@ export default function App() {
       {preloadFailures.length > 0 && screen !== "title" && (
         <div className="asset-warning" title={`${preloadFailures.length} 个资源未能预载`}>
           <span>!</span> {preloadFailures.length} 个资源不可用
+        </div>
+      )}
+      {studioSystemPreview === "loading" && (
+        <div className="runtime-loading runtime-studio-system" data-runtime-theme={resolvedAppearance} style={globalCss}>
+          <div className="runtime-loading__glow" />
+          <div className="runtime-loading__panel ui-responsive-skin" style={loadingCss}>
+            <div className="runtime-loading__eyebrow">STORYFORGE RUNTIME</div>
+            <div className="runtime-loading__title">正在准备故事</div>
+            <div className="runtime-loading__track"><span style={{ width: "64%" }} /></div>
+            <div className="runtime-loading__status">载入章节与美术资源…</div>
+          </div>
+        </div>
+      )}
+      {studioSystemPreview === "error" && (
+        <div className="runtime-loading runtime-studio-system" data-runtime-theme={resolvedAppearance} style={globalCss}>
+          <div className="runtime-error-card ui-responsive-skin" style={errorCss}>
+            <div className="runtime-error-card__icon">!</div>
+            <div className="runtime-error-card__title">故事载入失败</div>
+            <div className="runtime-error-card__detail">这里预览玩家实际看到的错误状态与重试入口。</div>
+            <button>重新加载</button>
+          </div>
         </div>
       )}
       </div>

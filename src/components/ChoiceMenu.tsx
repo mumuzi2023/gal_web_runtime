@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useGameStore } from "../store";
-import { buttonStyle, buttonHoverStyle, defaultChoiceButton } from "../uiConfig";
+import { buttonStyle, buttonHoverStyle, defaultChoiceButton, resolveGameUi } from "../uiConfig";
 import type { UiButtonStyle } from "../types";
 
 export default function ChoiceMenu() {
@@ -11,7 +11,7 @@ export default function ChoiceMenu() {
 
   if (!waitingForChoice || choiceOptions.length === 0) return null;
 
-  const cfg = gameData?.config?.ui?.choiceButtons;
+  const cfg = resolveGameUi(gameData?.ui || gameData?.config?.ui).choiceButtons;
 
   return (
     <div className="choice-layer" role="dialog" aria-label="请选择接下来的行动">
@@ -46,7 +46,7 @@ function ChoiceButton({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{ ...normal, ...(hovered ? hover : {}), animationDelay: `${index * 100}ms` }}
-      className="choice-btn choice-stagger"
+      className="choice-btn choice-stagger ui-responsive-skin"
     >
       {label}
     </button>

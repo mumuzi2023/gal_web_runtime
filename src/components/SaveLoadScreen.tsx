@@ -1,4 +1,13 @@
 import { useGameStore } from "../store";
+import {
+  defaultLightPanel,
+  panelOverlayStyle,
+  panelStyle,
+  resolvePanelUi,
+  responsiveSkinStyle,
+} from "../uiConfig";
+import type { CSSProperties } from "react";
+import { resolveAssetUrl } from "../assets";
 
 export default function SaveLoadScreen() {
   const screen = useGameStore((s) => s.screen);
@@ -11,6 +20,18 @@ export default function SaveLoadScreen() {
   if (screen !== "save" && screen !== "load") return null;
 
   const isSave = screen === "save";
+  const ui = gameData?.ui || gameData?.config?.ui;
+  const pageCfg = ui?.pages?.saveLoad;
+  const surfaceCfg = resolvePanelUi(ui, "saveLoad");
+  const surfaceCss = panelStyle(surfaceCfg, defaultLightPanel);
+  const overlayCss = panelOverlayStyle(surfaceCfg, defaultLightPanel);
+  const pageCss = responsiveSkinStyle(pageCfg?.pageBackground);
+  const slotCss = pageCfg?.slot ? panelStyle(pageCfg.slot, {}) : undefined;
+  const layoutCss = {
+    "--save-columns-desktop": String(pageCfg?.desktopColumns || 4),
+    "--save-columns-mobile": String(pageCfg?.mobileColumns || 2),
+    "--save-thumbnail-ratio": pageCfg?.thumbnailRatio || "16 / 9",
+  } as CSSProperties;
   const handleSlotClick = (slotId: number) => {
     if (isSave) {
       saveGame(slotId);
@@ -31,15 +52,13 @@ export default function SaveLoadScreen() {
       expressions["normal"] ||
       Object.values(expressions)[0] ||
       "";
-    if (!raw) return "";
-    if (raw.startsWith("http")) return raw;
-    return manifest?.[raw] || raw;
+    return resolveAssetUrl(raw, manifest);
   };
 
   return (
-    <div className="runtime-overlay" role="dialog" aria-modal="true" aria-labelledby="save-load-title">
-      <div className="runtime-overlay__scrim" />
-      <section className="runtime-overlay__surface save-load-surface">
+    <div className="runtime-overlay ui-responsive-skin" style={pageCss} role="dialog" aria-modal="true" aria-labelledby="save-load-title">
+      <div className="runtime-overlay__scrim" style={overlayCss} />
+      <section className={`runtime-overlay__surface save-load-surface ui-responsive-skin ${surfaceCfg?.skin || surfaceCfg?.backgroundImage ? "has-ui-skin" : ""}`} style={surfaceCss}>
         <header className="runtime-overlay__header">
           <div>
             <h2 id="save-load-title" className="runtime-overlay__title">{isSave ? "保存进度" : "读取进度"}</h2>
@@ -48,16 +67,17 @@ export default function SaveLoadScreen() {
           <button onClick={closeOverlay} className="runtime-overlay__close" aria-label="关闭">✕</button>
         </header>
 
-        <div className="runtime-overlay__body save-slot-grid backlog-scroll">
+        <div className="runtime-overlay__body save-slot-grid backlog-scroll" style={layoutCss}>
           {saves.map((slot, i) => (
             <button
               key={i}
               onClick={() => handleSlotClick(i)}
-              className={`save-slot ${
+              className={`save-slot ui-responsive-skin ${
                 slot
                   ? "save-slot--filled"
                   : "save-slot--empty"
               } ${!slot && !isSave ? "save-slot--disabled" : ""}`}
+              style={slotCss}
               disabled={!slot && !isSave}
             >
               {/* Thumbnail area */}

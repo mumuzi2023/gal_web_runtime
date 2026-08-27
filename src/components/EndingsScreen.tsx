@@ -1,4 +1,11 @@
 import { useGameStore } from "../store";
+import {
+  defaultLightPanel,
+  panelOverlayStyle,
+  panelStyle,
+  resolvePanelUi,
+  responsiveSkinStyle,
+} from "../uiConfig";
 
 export default function EndingsScreen() {
   const screen = useGameStore((s) => s.screen);
@@ -9,10 +16,17 @@ export default function EndingsScreen() {
   if (screen !== "endings" || !gameData) return null;
 
   const allEndings = Object.entries(gameData.endings);
+  const ui = gameData.ui || gameData.config?.ui;
+  const pageCfg = ui?.pages?.endings;
+  const surfaceCfg = resolvePanelUi(ui, "endings");
+  const surfaceCss = panelStyle(surfaceCfg, defaultLightPanel);
+  const overlayCss = panelOverlayStyle(surfaceCfg, defaultLightPanel);
+  const pageCss = responsiveSkinStyle(pageCfg?.pageBackground);
+  const cardCss = pageCfg?.card ? panelStyle(pageCfg.card, {}) : undefined;
   return (
-    <div className="runtime-overlay" role="dialog" aria-modal="true" aria-labelledby="endings-title">
-      <div className="runtime-overlay__scrim" />
-      <section className="runtime-overlay__surface endings-surface">
+    <div className="runtime-overlay ui-responsive-skin" style={pageCss} role="dialog" aria-modal="true" aria-labelledby="endings-title">
+      <div className="runtime-overlay__scrim" style={overlayCss} />
+      <section className={`runtime-overlay__surface endings-surface ui-responsive-skin ${surfaceCfg?.skin || surfaceCfg?.backgroundImage ? "has-ui-skin" : ""}`} style={surfaceCss}>
         <header className="runtime-overlay__header">
           <div>
             <h2 id="endings-title" className="runtime-overlay__title">结局收藏</h2>
@@ -27,7 +41,11 @@ export default function EndingsScreen() {
               return (
                 <article
                   key={id}
-                  className={`ending-card ${reached ? "ending-card--reached" : "ending-card--locked"}`}
+                  className={`ending-card ui-responsive-skin ${reached ? "ending-card--reached" : "ending-card--locked"}`}
+                  style={{
+                    ...cardCss,
+                    borderColor: reached ? pageCfg?.reachedAccent : pageCfg?.lockedAccent,
+                  }}
                 >
                   <div className="ending-card__icon">
                       {reached ? "★" : "☆"}

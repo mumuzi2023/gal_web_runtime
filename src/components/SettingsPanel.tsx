@@ -1,5 +1,5 @@
 import { useGameStore } from "../store";
-import { panelStyle, defaultLightPanel } from "../uiConfig";
+import { panelOverlayStyle, panelStyle, defaultLightPanel, resolvePanelUi, responsiveSkinStyle } from "../uiConfig";
 
 export default function SettingsPanel() {
   const screen = useGameStore((s) => s.screen);
@@ -12,22 +12,55 @@ export default function SettingsPanel() {
 
   if (screen !== "settings") return null;
 
-  const panelCfg = gameData?.config?.ui?.settingsPanel;
+  const ui = gameData?.ui || gameData?.config?.ui;
+  const panelCfg = resolvePanelUi(ui, "settings");
   const panelCss = panelStyle(panelCfg, defaultLightPanel);
+  const overlayCss = panelOverlayStyle(panelCfg, defaultLightPanel);
+  const allowThemeChoice = ui?.global?.allowPlayerThemeChoice !== false;
+  const pageCss = responsiveSkinStyle(ui?.pages?.settings?.pageBackground);
 
   return (
-    <div className="runtime-overlay" role="dialog" aria-modal="true" aria-labelledby="settings-title">
-      <div className="runtime-overlay__scrim" />
-      <section className="runtime-overlay__surface settings-surface" style={panelCss}>
+    <div className="runtime-overlay ui-responsive-skin" style={pageCss} role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div className="runtime-overlay__scrim" style={overlayCss} />
+      <section className={`runtime-overlay__surface settings-surface ui-responsive-skin ${panelCfg?.skin || panelCfg?.backgroundImage ? "has-ui-skin" : ""}`} style={panelCss}>
         <header className="runtime-overlay__header">
           <div>
             <h2 id="settings-title" className="runtime-overlay__title">设置</h2>
-            <div className="runtime-overlay__subtitle">调整阅读节奏与声音</div>
+            <div className="runtime-overlay__subtitle">调整显示、阅读节奏与声音</div>
           </div>
           <button onClick={closeOverlay} className="runtime-overlay__close" aria-label="关闭设置">✕</button>
         </header>
 
         <div className="runtime-overlay__body settings-list">
+          {allowThemeChoice && <fieldset className="settings-appearance">
+            <legend>界面外观</legend>
+            <div className="settings-appearance__options">
+              <button
+                type="button"
+                aria-pressed={settings.appearance === "project"}
+                onClick={() => updateSettings({ appearance: "project" })}
+              >
+                <span aria-hidden="true">◒</span>
+                作品默认
+              </button>
+              <button
+                type="button"
+                aria-pressed={settings.appearance === "light"}
+                onClick={() => updateSettings({ appearance: "light" })}
+              >
+                <span aria-hidden="true">☀</span>
+                浅色
+              </button>
+              <button
+                type="button"
+                aria-pressed={settings.appearance === "dark"}
+                onClick={() => updateSettings({ appearance: "dark" })}
+              >
+                <span aria-hidden="true">◐</span>
+                深色
+              </button>
+            </div>
+          </fieldset>}
           <SliderSetting label="文字速度" value={settings.textSpeed} min={10} max={100} step={5}
             displayValue={`${settings.textSpeed} 字/秒`} onChange={(v) => updateSettings({ textSpeed: v })} />
           <SliderSetting label="自动播放速度" value={settings.autoSpeed} min={1} max={10} step={0.5}

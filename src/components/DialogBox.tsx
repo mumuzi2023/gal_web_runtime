@@ -4,6 +4,8 @@ import {
   buttonStyle,
   buttonHoverStyle,
   defaultMenuButton,
+  resolveGameUi,
+  toolbarStyle,
   textboxStyle,
   nameplateStyle,
 } from "../uiConfig";
@@ -25,16 +27,27 @@ export default function DialogBox() {
   const setScreen = useGameStore((s) => s.setScreen);
   const gameData = useGameStore((s) => s.gameData);
 
-  const ui = gameData?.config?.ui;
-  const textboxCss = textboxStyle(ui?.textbox);
-  const nameplateCss = nameplateStyle(ui?.nameplate, currentCharacterColor);
-  const menuOverrides = ui?.menuButtonOverrides || {};
+  const ui = gameData?.ui || gameData?.config?.ui;
+  const gameUi = resolveGameUi(ui);
+  const textboxCss = textboxStyle(gameUi.textbox);
+  const nameplateCss = nameplateStyle(gameUi.nameplate, currentCharacterColor);
+  const toolbarCss = toolbarStyle(gameUi.menuButtons);
+  const menuOverrides = gameUi.menuButtonOverrides || {};
 
   const [displayedText, setDisplayedText] = useState(isTyping ? "" : currentText);
   const [typingComplete, setTypingComplete] = useState(!isTyping);
   const timerRef = useRef<ReturnType<typeof setInterval>>(undefined);
   const autoTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const charIndexRef = useRef(0);
+
+  // Studio previews can replace the sample line without advancing the script.
+  // Keep the rendered copy in sync when no typewriter animation is active.
+  useEffect(() => {
+    if (isTyping) return;
+    setDisplayedText(currentText);
+    setTypingComplete(true);
+    charIndexRef.current = currentText.length;
+  }, [currentText, isTyping]);
 
   // Typewriter effect
   useEffect(() => {
@@ -80,23 +93,23 @@ export default function DialogBox() {
   const menuActions: { key: string; label: string; onClick: () => void; activeOverride?: UiButtonStyle }[] = [
     {
       key: "auto",
-      label: prefixIcon(menuOverrides.auto, "自动"),
+      label: "自动",
       onClick: toggleAutoMode,
-      activeOverride: autoMode ? { background: "rgba(59, 130, 246, 0.85)", textColor: "#fff" } : undefined,
+      activeOverride: autoMode ? { background: "var(--runtime-active-bg)", textColor: "var(--runtime-active-text)" } : undefined,
     },
-    { key: "backlog", label: prefixIcon(menuOverrides.backlog, "记录"), onClick: () => setScreen("backlog") },
-    { key: "save", label: prefixIcon(menuOverrides.save, "存档"), onClick: () => setScreen("save") },
-    { key: "progress", label: prefixIcon(menuOverrides.progress, "进度"), onClick: () => setScreen("progress") },
-    { key: "menu", label: prefixIcon(menuOverrides.menu, "菜单"), onClick: () => setScreen("settings") },
+    { key: "backlog", label: "记录", onClick: () => setScreen("backlog") },
+    { key: "save", label: "存档", onClick: () => setScreen("save") },
+    { key: "progress", label: "进度", onClick: () => setScreen("progress") },
+    { key: "menu", label: "菜单", onClick: () => setScreen("settings") },
   ];
 
   return (
     <div className="dialog-click-layer" onClick={handleClick}>
-      <section className="dialog-panel" style={textboxCss} aria-live="polite">
+      <section className="dialog-panel ui-responsive-skin" style={textboxCss} aria-live="polite">
         {/* Name plate — floating above the dialog box */}
         {currentCharacter && (
           <div
-            className="dialog-nameplate"
+            className="dialog-nameplate ui-responsive-skin"
             style={nameplateCss}
           >
             {currentCharacter}
@@ -104,17 +117,18 @@ export default function DialogBox() {
         )}
 
         {/* Menu buttons — top-right corner of dialog box */}
-        <nav className="dialog-toolbar" aria-label="游戏菜单">
-          {menuActions.map((a) => (
+        <nav className="dialog-toolbar" style={toolbarCss} aria-label="游戏菜单">
+          {menuActions.filter((a) => menuOverrides[a.key]?.hidden !== true).map((a) => (
             <MenuButton
               key={a.key}
-              label={a.label}
+              actionKey={a.key}
+              label={prefixIcon(menuOverrides[a.key], menuOverrides[a.key]?.label || a.label)}
               onClick={(e) => {
                 e.stopPropagation();
                 a.onClick();
               }}
               override={{ ...(menuOverrides[a.key] || {}), ...(a.activeOverride || {}) }}
-              base={ui?.menuButtons}
+              base={gameUi.menuButtons}
             />
           ))}
         </nav>
@@ -122,10 +136,10 @@ export default function DialogBox() {
         {/* Text area */}
         <div
           className="dialog-copy"
-          style={{ color: ui?.textbox?.textColor || "rgba(255,255,255,0.9)" }}
+          style={{ color: gameUi.textbox?.textColor || "var(--runtime-text-primary)" }}
         >
           {displayedText}
-          {isTyping && <span className="typewriter-cursor ml-0.5 text-white/70">|</span>}
+          {isTyping && <span className="typewriter-cursor dialog-cursor ml-0.5">|</span>}
         </div>
 
         {/* CTC indicator — bottom-right, bouncing triangle */}
@@ -142,11 +156,13 @@ function prefixIcon(o: UiButtonStyle | undefined, label: string): string {
 }
 
 function MenuButton({
+  actionKey,
   label,
   onClick,
   override,
   base,
 }: {
+  actionKey: string;
   label: string;
   onClick: (e: React.MouseEvent) => void;
   override?: UiButtonStyle;
@@ -156,15 +172,23 @@ function MenuButton({
   const normal = buttonStyle(undefined, merged);
   const hover = buttonHoverStyle(undefined, merged);
   const [hovered, setHovered] = useState(false);
+  const accessibleLabel = merged.tooltip || merged.label || label;
   return (
     <button
+      data-menu-key={actionKey}
+      data-tooltip={accessibleLabel}
+      data-tooltip-visible={hovered ? "true" : undefined}
+      aria-label={accessibleLabel}
+      title={accessibleLabel}
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      onFocus={() => setHovered(true)}
+      onBlur={() => setHovered(false)}
       style={{ ...normal, ...(hovered ? hover : {}) }}
-      className="dialog-tool-button"
+      className="dialog-tool-button ui-responsive-skin"
     >
-      {label}
+      {merged.showLabel === false ? null : (merged.label || label)}
     </button>
   );
 }

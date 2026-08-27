@@ -1,9 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useGameStore } from "../store";
-import type { ChapterDef, Command, GameData } from "../types";
+import {
+  defaultLightPanel,
+  panelOverlayStyle,
+  panelStyle,
+  resolvePanelUi,
+  responsiveSkinStyle,
+  uiImageUrl,
+} from "../uiConfig";
+import type { ChapterDef, Command, GameData, UiFlowEdgeCurve } from "../types";
 
-const NODE_W = 224;
-const NODE_H = 86;
+const DEFAULT_NODE_W = 224;
+const DEFAULT_NODE_H = 86;
 const X_GAP = 58;
 const Y_GAP = 104;
 const PAD_X = 88;
@@ -136,6 +144,8 @@ function buildFlowGraph(
   gameData: GameData,
   visitedScenes: Set<string>,
   currentSceneKey: string,
+  nodeWidth: number,
+  nodeHeight: number,
 ): FlowGraph {
   const configuredOrder = gameData.scene_order || [];
   const orderedKeys = [
@@ -234,13 +244,13 @@ function buildFlowGraph(
   }
 
   const maxLayerSize = Math.max(1, ...orderedLayers.map(([, group]) => group.length));
-  const width = Math.max(760, PAD_X * 2 + maxLayerSize * NODE_W + (maxLayerSize - 1) * X_GAP);
+  const width = Math.max(760, PAD_X * 2 + maxLayerSize * nodeWidth + (maxLayerSize - 1) * X_GAP);
   const maxDepth = Math.max(...orderedLayers.map(([layer]) => layer));
-  const height = Math.max(460, PAD_Y * 2 + (maxDepth + 1) * NODE_H + maxDepth * Y_GAP);
+  const height = Math.max(460, PAD_Y * 2 + (maxDepth + 1) * nodeHeight + maxDepth * Y_GAP);
   const nodes: FlowNode[] = [];
 
   for (const [layer, group] of orderedLayers) {
-    const layerWidth = group.length * NODE_W + Math.max(0, group.length - 1) * X_GAP;
+    const layerWidth = group.length * nodeWidth + Math.max(0, group.length - 1) * X_GAP;
     const startX = (width - layerWidth) / 2;
     group.forEach((sceneKey, index) => {
       const sceneMeta = meta.get(sceneKey)!;
@@ -251,8 +261,8 @@ function buildFlowGraph(
         subtitle: kindLabel(sceneMeta.kind),
         summary: visited ? sceneMeta.summary : "继续游玩以解锁这一段剧情。",
         kind: sceneMeta.kind,
-        x: startX + index * (NODE_W + X_GAP),
-        y: PAD_Y + layer * (NODE_H + Y_GAP),
+        x: startX + index * (nodeWidth + X_GAP),
+        y: PAD_Y + layer * (nodeHeight + Y_GAP),
         visited,
         current: sceneKey === currentSceneKey,
       });
@@ -267,13 +277,26 @@ function buildFlowGraph(
   return { nodes, edges, width, height };
 }
 
-function edgePath(from: FlowNode, to: FlowNode, reverse: boolean, index: number): string {
-  const startX = from.x + NODE_W / 2;
-  const startY = from.y + NODE_H;
-  const endX = to.x + NODE_W / 2;
+function edgePath(
+  from: FlowNode,
+  to: FlowNode,
+  reverse: boolean,
+  index: number,
+  nodeWidth: number,
+  nodeHeight: number,
+  curve: UiFlowEdgeCurve,
+): string {
+  const startX = from.x + nodeWidth / 2;
+  const startY = from.y + nodeHeight;
+  const endX = to.x + nodeWidth / 2;
   const endY = to.y;
+  if (curve === "straight") return `M${startX},${startY} L${endX},${endY}`;
+  if (curve === "step") {
+    const middleY = startY + (endY - startY) / 2;
+    return `M${startX},${startY} V${middleY} H${endX} V${endY}`;
+  }
   if (reverse) {
-    const lane = Math.max(from.x + NODE_W, to.x + NODE_W) + 36 + (index % 4) * 12;
+    const lane = Math.max(from.x + nodeWidth, to.x + nodeWidth) + 36 + (index % 4) * 12;
     return `M${startX},${startY} C${lane},${startY + 30} ${lane},${endY - 30} ${endX},${endY}`;
   }
   const bend = Math.max(42, (endY - startY) * 0.48);
@@ -288,6 +311,14 @@ export default function ProgressPanel() {
   const visitedScenes = useGameStore((state) => state.visitedScenes);
   const saves = useGameStore((state) => state.saves);
   const reachedEndings = useGameStore((state) => state.reachedEndings);
+  const ui = gameData?.ui || gameData?.config?.ui;
+  const flowCfg = ui?.pages?.flow;
+  const nodeCfg = flowCfg?.node;
+  const edgeCfg = flowCfg?.edge;
+  const nodeWidth = clamp(nodeCfg?.width || DEFAULT_NODE_W, 160, 360);
+  const nodeHeight = clamp(nodeCfg?.height || DEFAULT_NODE_H, 68, 160);
+  const nodeDesktopSkin = uiImageUrl(nodeCfg?.skin?.desktop);
+  const nodeMobileSkin = uiImageUrl(nodeCfg?.skin?.mobile || nodeCfg?.skin?.desktop);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const pointersRef = useRef(new Map<number, { x: number; y: number }>());
@@ -313,8 +344,8 @@ export default function ProgressPanel() {
   }, [gameData, saves, visitedScenes]);
 
   const graph = useMemo(
-    () => gameData ? buildFlowGraph(gameData, unlocked, currentSceneKey) : { nodes: [], edges: [], width: 720, height: 420 },
-    [currentSceneKey, gameData, unlocked],
+    () => gameData ? buildFlowGraph(gameData, unlocked, currentSceneKey, nodeWidth, nodeHeight) : { nodes: [], edges: [], width: 720, height: 420 },
+    [currentSceneKey, gameData, nodeHeight, nodeWidth, unlocked],
   );
   const nodeMap = useMemo(() => new Map(graph.nodes.map((node) => [node.id, node])), [graph.nodes]);
   const selected = selectedId ? nodeMap.get(selectedId) : undefined;
@@ -406,10 +437,28 @@ export default function ProgressPanel() {
 
   if (screen !== "progress" || !gameData) return null;
 
+  const surfaceCfg = resolvePanelUi(ui, "flow");
+  const surfaceCss = panelStyle(surfaceCfg, defaultLightPanel);
+  const overlayCss = panelOverlayStyle(surfaceCfg, defaultLightPanel);
+  const pageCss = responsiveSkinStyle(flowCfg?.pageBackground);
+  const nodeRadius = nodeCfg?.shape === "rect"
+    ? 0
+    : nodeCfg?.shape === "pill"
+      ? nodeHeight / 2
+      : nodeCfg?.radius ?? 16;
+  const edgeMarker = edgeCfg?.arrow === "none" ? undefined : edgeCfg?.arrow === "dot" ? "url(#flow-dot-marker)" : "url(#flow-arrow)";
+  const semanticNodeColor = (node: FlowNode): string | undefined => {
+    if (!node.visited) return nodeCfg?.lockedColor;
+    if (node.kind === "route") return nodeCfg?.routeColor;
+    if (node.kind === "ending") return nodeCfg?.endingColor;
+    if (node.kind === "side") return nodeCfg?.sideColor;
+    return nodeCfg?.commonColor;
+  };
+
   return (
-    <div className="runtime-overlay flow-overlay" role="dialog" aria-modal="true" aria-labelledby="flow-title">
-      <div className="runtime-overlay__scrim" />
-      <section className="runtime-overlay__surface flow-surface">
+    <div className="runtime-overlay flow-overlay ui-responsive-skin" style={pageCss} role="dialog" aria-modal="true" aria-labelledby="flow-title">
+      <div className="runtime-overlay__scrim" style={overlayCss} />
+      <section className={`runtime-overlay__surface flow-surface ui-responsive-skin ${surfaceCfg?.skin || surfaceCfg?.backgroundImage ? "has-ui-skin" : ""}`} style={surfaceCss}>
         <header className="runtime-overlay__header flow-header">
           <div>
             <h2 id="flow-title" className="runtime-overlay__title">剧情路线</h2>
@@ -434,6 +483,7 @@ export default function ProgressPanel() {
         <div
           ref={containerRef}
           className="flow-canvas"
+          style={flowCfg?.canvasBackground ? { background: flowCfg.canvasBackground } : undefined}
           onPointerDown={beginGesture}
           onPointerMove={moveGesture}
           onPointerUp={endGesture}
@@ -455,6 +505,9 @@ export default function ProgressPanel() {
               <marker id="flow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
                 <path d="M 0 0 L 10 5 L 0 10 z" />
               </marker>
+              <marker id="flow-dot-marker" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6">
+                <circle cx="5" cy="5" r="4" />
+              </marker>
               <filter id="flow-shadow" x="-30%" y="-30%" width="160%" height="180%">
                 <feDropShadow dx="0" dy="8" stdDeviation="8" floodOpacity="0.28" />
               </filter>
@@ -465,14 +518,23 @@ export default function ProgressPanel() {
                 const from = nodeMap.get(edge.from);
                 const to = nodeMap.get(edge.to);
                 if (!from || !to) return null;
-                const path = edgePath(from, to, edge.reverse, index);
+                const path = edgePath(from, to, edge.reverse, index, nodeWidth, nodeHeight, edgeCfg?.curve || "smooth");
                 const label = edge.label && (from.visited ? edge.label : "？？？");
-                const labelX = (from.x + to.x) / 2 + NODE_W / 2;
-                const labelY = (from.y + to.y + NODE_H) / 2 - 7;
+                const labelX = (from.x + to.x) / 2 + nodeWidth / 2;
+                const labelY = (from.y + to.y + nodeHeight) / 2 - 7;
                 const labelWidth = Math.min(180, Math.max(48, (label?.length || 0) * 12 + 18));
                 return (
                   <g key={`${edge.from}-${edge.to}-${index}`}>
-                    <path d={path} className={edge.choice ? "flow-edge flow-edge--choice" : "flow-edge"} markerEnd="url(#flow-arrow)" />
+                    <path
+                      d={path}
+                      className={edge.choice ? "flow-edge flow-edge--choice" : "flow-edge"}
+                      markerEnd={edgeMarker}
+                      style={{
+                        stroke: edge.choice ? edgeCfg?.choiceColor : edgeCfg?.color,
+                        strokeWidth: edgeCfg?.width,
+                        strokeDasharray: edgeCfg?.line === "dashed" ? "8 6" : undefined,
+                      }}
+                    />
                     {label && (
                       <g className="flow-edge-label">
                         <rect x={labelX - labelWidth / 2} y={labelY - 13} width={labelWidth} height={24} rx={12} />
@@ -498,11 +560,29 @@ export default function ProgressPanel() {
                     if (event.key === "Enter" || event.key === " ") setSelectedId(node.id);
                   }}
                 >
-                  <rect width={NODE_W} height={NODE_H} rx={16} filter="url(#flow-shadow)" />
-                  <circle cx={24} cy={23} r={7} />
-                  <text className="flow-node__kind" x={39} y={27}>{node.subtitle}</text>
-                  <text className="flow-node__title" x={20} y={58}>{node.title.length > 15 ? `${node.title.slice(0, 15)}…` : node.title}</text>
-                  {node.current && <text className="flow-node__current" x={NODE_W - 16} y={27} textAnchor="end">当前</text>}
+                  {nodeCfg?.shape === "diamond" ? (
+                    <polygon
+                      className="flow-node__shape"
+                      points={`${nodeWidth / 2},0 ${nodeWidth},${nodeHeight / 2} ${nodeWidth / 2},${nodeHeight} 0,${nodeHeight / 2}`}
+                      filter="url(#flow-shadow)"
+                      style={{ fill: nodeCfg.background, stroke: semanticNodeColor(node) || nodeCfg.borderColor }}
+                    />
+                  ) : (
+                    <rect
+                      className="flow-node__shape"
+                      width={nodeWidth}
+                      height={nodeHeight}
+                      rx={nodeRadius}
+                      filter="url(#flow-shadow)"
+                      style={{ fill: nodeCfg?.background, stroke: semanticNodeColor(node) || nodeCfg?.borderColor }}
+                    />
+                  )}
+                  {nodeDesktopSkin && <image className="flow-node__skin flow-node__skin--desktop" href={nodeDesktopSkin} width={nodeWidth} height={nodeHeight} preserveAspectRatio="none" />}
+                  {nodeMobileSkin && <image className="flow-node__skin flow-node__skin--mobile" href={nodeMobileSkin} width={nodeWidth} height={nodeHeight} preserveAspectRatio="none" />}
+                  <circle cx={24} cy={23} r={7} style={{ fill: semanticNodeColor(node) }} />
+                  <text className="flow-node__kind" x={39} y={27} style={{ fill: nodeCfg?.textColor }}>{node.subtitle}</text>
+                  <text className="flow-node__title" x={20} y={Math.min(nodeHeight - 18, 58)} style={{ fill: nodeCfg?.textColor }}>{node.title.length > 15 ? `${node.title.slice(0, 15)}…` : node.title}</text>
+                  {node.current && <text className="flow-node__current" x={nodeWidth - 16} y={27} textAnchor="end">当前</text>}
                 </g>
               ))}
             </g>

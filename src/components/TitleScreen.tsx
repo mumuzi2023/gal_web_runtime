@@ -4,8 +4,11 @@ import {
   buttonStyle,
   buttonHoverStyle,
   defaultTitleButton,
+  resolveTitleConfig,
+  responsiveSkinStyle,
 } from "../uiConfig";
 import type { UiButtonStyle } from "../types";
+import { resolveAssetUrl } from "../assets";
 
 export default function TitleScreen() {
   const gameData = useGameStore((s) => s.gameData);
@@ -17,12 +20,21 @@ export default function TitleScreen() {
 
   const hasSaves = saves.some((s) => s !== null);
   const meta = gameData.meta;
-  const titleCfg = gameData.config?.ui?.title;
+  const titleCfg = resolveTitleConfig(gameData.ui || gameData.config?.ui);
   const layout = titleCfg?.layout || "left";
 
   const firstKey = gameData.start_scene || gameData.scene_order?.[0] || Object.keys(gameData.scenes)[0];
   const rawTitleBg = firstKey ? gameData.scenes[firstKey]?.background || "" : "";
-  const titleBg = gameData._asset_manifest?.[rawTitleBg] || rawTitleBg;
+  const fallbackTitleBg = resolveAssetUrl(rawTitleBg, gameData._asset_manifest);
+  const resolveSkinUrl = (value: string | undefined) =>
+    value ? resolveAssetUrl(value, gameData._asset_manifest) : undefined;
+  const titleSkin = titleCfg?.background ? {
+    ...titleCfg.background,
+    desktop: resolveSkinUrl(titleCfg.background.desktop),
+    mobile: resolveSkinUrl(titleCfg.background.mobile),
+  } : undefined;
+  const titleBg = titleSkin?.desktop || fallbackTitleBg;
+  const titleBackgroundCss = responsiveSkinStyle(titleSkin, titleBg);
 
   const baseBtn: UiButtonStyle | undefined = titleCfg?.buttons;
   const overrides = titleCfg?.buttonOverrides || {};
@@ -35,26 +47,17 @@ export default function TitleScreen() {
   ];
 
   return (
-    <section className={`title-screen title-screen--${layout} title-fade-in`}>
+    <section className={`title-screen title-screen--${layout} title-fade-in`} style={titleBackgroundCss}>
       <div className="title-screen__fallback" aria-hidden="true" />
-      {titleBg && (
-        <img
-          src={titleBg}
-          alt=""
-          className="title-screen__background"
-          onError={(e) => {
-            (e.target as HTMLImageElement).style.display = "none";
-          }}
-        />
-      )}
-      <div className="title-screen__veil" />
+      {titleBg && <div className="title-screen__background ui-responsive-skin" style={titleBackgroundCss} />}
+      <div className="title-screen__veil" style={titleCfg?.veil ? { background: titleCfg.veil } : undefined} />
 
       <div className="title-screen__content">
-        <div className="title-screen__kicker">INTERACTIVE STORY</div>
+        <div className="title-screen__kicker">{titleCfg?.kicker || "INTERACTIVE STORY"}</div>
         <h1
           className="title-screen__heading"
           style={{
-            color: titleCfg?.titleColor || "#fff",
+            color: titleCfg?.titleColor || "var(--runtime-title-text)",
           }}
         >
           {meta.title}
@@ -62,7 +65,7 @@ export default function TitleScreen() {
         {meta.description && (
           <p
             className="title-screen__description"
-            style={{ color: titleCfg?.subtitleColor || "rgba(255,255,255,0.6)" }}
+            style={{ color: titleCfg?.subtitleColor || "var(--runtime-title-secondary)" }}
           >
             {meta.description}
           </p>
@@ -70,11 +73,12 @@ export default function TitleScreen() {
 
         <nav className="title-screen__menu" aria-label="标题菜单">
           {buttons
-            .filter((b) => b.show)
+            .filter((b) => b.show && overrides[b.key]?.hidden !== true)
             .map((b) => (
               <MenuButton
                 key={b.key}
-                label={b.label}
+                actionKey={b.key}
+                label={overrides[b.key]?.label || b.label}
                 onClick={b.onClick}
                 override={overrides[b.key]}
                 base={baseBtn}
@@ -91,11 +95,13 @@ export default function TitleScreen() {
 }
 
 function MenuButton({
+  actionKey,
   label,
   onClick,
   override,
   base,
 }: {
+  actionKey: string;
   label: string;
   onClick: () => void;
   override?: UiButtonStyle;
@@ -108,11 +114,12 @@ function MenuButton({
   const labelText = merged.icon ? `${merged.icon}  ${label}` : label;
   return (
     <button
+      data-title-menu-key={actionKey}
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{ ...normal, ...(hovered ? hover : {}) }}
-      className="title-menu-button text-lg tracking-wider"
+      className="title-menu-button ui-responsive-skin text-lg tracking-wider"
     >
       {labelText}
     </button>

@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "gal_web_runtime",
-    "updated_at": "2026-08-11T12:35:00+08:00",
+    "updated_at": "2026-08-24T10:00:00+08:00",
     "owner": "copilot"
   },
   "items": [
@@ -144,6 +144,56 @@
       "acceptance": "GameData 声明 Generator 输出的 chapters/side_chapters，ProgressPanel 类型检查和生产构建通过。",
       "notes": "新增 ChapterDef/SideChapterDef 并接入 GameData；npm run build 通过。npm run lint 仍有既有 Math.random purity、DialogBox setState-in-effect 和 hook dependency 问题。",
       "last_updated": "2026-08-11T12:35:00+08:00"
+    },
+    {
+      "id": "T015",
+      "title": "扩展统一 UI 主题、字体与页面配置契约",
+      "status": "done",
+      "priority": "P0",
+      "depends_on": ["T014"],
+      "acceptance": "Runtime 支持项目默认 Light/Dark、全局字体与语义颜色、标题专用背景、页面级设计和旧版 ui 配置兼容。",
+      "notes": "UiConfig v2 已接入全局语义色、字体、圆角、阴影、项目默认 Light/Dark 与玩家 project/light/dark 覆盖。",
+      "last_updated": "2026-08-24T17:20:00+08:00"
+    },
+    {
+      "id": "T016",
+      "title": "支持桌面与移动端 UI 图片皮肤和九宫格",
+      "status": "done",
+      "priority": "P0",
+      "depends_on": ["T015"],
+      "acceptance": "同一 UI 插槽可声明 desktop/mobile 图片、透明度、适配模式、安全区和九宫格边距，运行时根据视口选择并正确拉伸。",
+      "notes": "已支持桌面/移动图片、cover/contain/stretch/tile/nine-slice、安全区，并修复九宫格与普通背景/边框重复覆盖。",
+      "last_updated": "2026-08-24T17:20:00+08:00"
+    },
+    {
+      "id": "T017",
+      "title": "接入标题、存读档、回想、结局、设置和流程图完整样式",
+      "status": "done",
+      "priority": "P0",
+      "depends_on": ["T015", "T016"],
+      "acceptance": "所有页面实际消费各自配置，流程图支持节点形状/尺寸、连线和中文语义颜色，标题页不再强制复用首场景背景。",
+      "notes": "标题、游戏画面、存读档、回想、结局、设置、系统状态和流程图均消费统一页面配置；流程节点/连线几何与语义色可配置。",
+      "last_updated": "2026-08-24T17:20:00+08:00"
+    },
+    {
+      "id": "T018",
+      "title": "提供 UI Studio 实时预览协议",
+      "status": "done",
+      "priority": "P1",
+      "depends_on": ["T017"],
+      "acceptance": "Generator 可向嵌入 Runtime 发送草稿配置、切换目标页面和设备尺寸，Runtime 无需刷新即可反映编辑结果。",
+      "notes": "Runtime 支持 Studio postMessage 草稿、页面目标和系统状态预览，生成器 iframe 直接复用真实运行时组件。",
+      "last_updated": "2026-08-24T17:20:00+08:00"
+    },
+    {
+      "id": "T019",
+      "title": "验证完整 UI 配置和响应式图片皮肤",
+      "status": "done",
+      "priority": "P0",
+      "depends_on": ["T017", "T018"],
+      "acceptance": "类型检查、生产构建和浏览器回归覆盖 Light 默认、玩家主题覆盖、所有页面、桌面/移动图片选择与九宫格渲染。",
+      "notes": "生产构建通过；浏览器验证标题、面板、流程图、系统状态及桌面/移动九宫格。修复透明边距、安全区覆盖移动布局和 Studio 初始化竞态，控制台无错误。",
+      "last_updated": "2026-08-24T18:00:00+08:00"
     }
   ]
 }

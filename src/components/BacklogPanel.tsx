@@ -1,5 +1,13 @@
 import { useRef, useEffect } from "react";
 import { useGameStore } from "../store";
+import { resolveAssetUrl } from "../assets";
+import {
+  defaultLightPanel,
+  panelOverlayStyle,
+  panelStyle,
+  resolvePanelUi,
+  responsiveSkinStyle,
+} from "../uiConfig";
 
 export default function BacklogPanel() {
   const screen = useGameStore((s) => s.screen);
@@ -15,6 +23,14 @@ export default function BacklogPanel() {
 
   if (screen !== "backlog") return null;
 
+  const ui = gameData?.ui || gameData?.config?.ui;
+  const pageCfg = ui?.pages?.backlog;
+  const surfaceCfg = resolvePanelUi(ui, "backlog");
+  const surfaceCss = panelStyle(surfaceCfg, defaultLightPanel);
+  const overlayCss = panelOverlayStyle(surfaceCfg, defaultLightPanel);
+  const pageCss = responsiveSkinStyle(pageCfg?.pageBackground);
+  const entryCss = pageCfg?.entry ? panelStyle(pageCfg.entry, {}) : undefined;
+
   const resolveAvatar = (charKey: string | undefined, outfitId?: string): string => {
     if (!charKey || !gameData) return "";
     const charDef = gameData.characters[charKey];
@@ -26,9 +42,7 @@ export default function BacklogPanel() {
       expressions["normal"] ||
       Object.values(expressions)[0] ||
       "";
-    if (!raw) return "";
-    if (raw.startsWith("http")) return raw;
-    return manifest?.[raw] || raw;
+    return resolveAssetUrl(raw, manifest);
   };
 
   const needsSeparator = (i: number): boolean => {
@@ -39,9 +53,9 @@ export default function BacklogPanel() {
   };
 
   return (
-    <div className="runtime-overlay" role="dialog" aria-modal="true" aria-labelledby="backlog-title">
-      <div className="runtime-overlay__scrim" />
-      <section className="runtime-overlay__surface backlog-surface">
+    <div className="runtime-overlay ui-responsive-skin" style={pageCss} role="dialog" aria-modal="true" aria-labelledby="backlog-title">
+      <div className="runtime-overlay__scrim" style={overlayCss} />
+      <section className={`runtime-overlay__surface backlog-surface ui-responsive-skin ${surfaceCfg?.skin || surfaceCfg?.backgroundImage ? "has-ui-skin" : ""}`} style={surfaceCss}>
         <header className="runtime-overlay__header">
           <div>
             <h2 id="backlog-title" className="runtime-overlay__title">对话记录</h2>
@@ -62,7 +76,7 @@ export default function BacklogPanel() {
                       <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
                     </div>
                   )}
-                  <article className="backlog-entry">
+                  <article className="backlog-entry ui-responsive-skin" style={entryCss}>
                     {entry.character ? (
                       <div className="flex-shrink-0 w-10 h-10 rounded-full overflow-hidden border-2 border-gray-200 bg-gray-100">
                         {resolveAvatar(entry.character, entry.outfitId) ? (

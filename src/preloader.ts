@@ -1,4 +1,5 @@
 import type { Command, GameData } from "./types";
+import { resolveAssetUrl } from "./assets";
 
 /**
  * Browser asset cache.
@@ -123,9 +124,7 @@ export function getFailedAssets(): string[] {
 }
 
 function resolveAsset(path: string | undefined, gameData: GameData): string {
-  if (!path) return "";
-  if (/^(https?:|data:|blob:)/i.test(path)) return path;
-  return gameData._asset_manifest?.[path] || path;
+  return resolveAssetUrl(path, gameData._asset_manifest);
 }
 
 function visitCommands(commands: Command[], visitor: (cmd: Command) => void): void {
