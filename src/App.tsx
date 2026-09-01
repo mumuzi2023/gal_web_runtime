@@ -172,6 +172,7 @@ export default function App() {
       studioSurfaceRef.current = surface;
       const interactive = event.data.interactive === true;
       setStudioInteractive(interactive);
+      useGameStore.setState({ studioInteractive: interactive });
       if (!interactive) useGameStore.setState({ autoMode: false });
       if (ui) {
         useGameStore.setState((state) => state.gameData ? {

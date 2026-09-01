@@ -77,6 +77,8 @@ export interface GameState {
   setScreen: (s: Screen) => void;
   overlayReturnScreen: BaseScreen;
   closeOverlay: () => void;
+  /** True only while the embedded Studio is in playable Runtime mode. */
+  studioInteractive: boolean;
 
   // Startup/preload feedback
   preloadProgress: number;
@@ -211,7 +213,11 @@ export const useGameStore = create<GameState>((set, get) => {
   const advancePassiveCommand = () => {
     const params = new URLSearchParams(window.location.search);
     const studioTarget = Math.max(0, Number(params.get("command") || 0));
-    if (params.get("studio") === "1" && get().commandIndex >= studioTarget) return;
+    if (
+      params.get("studio") === "1"
+      && !get().studioInteractive
+      && get().commandIndex >= studioTarget
+    ) return;
     get().advanceCommand();
   };
 
@@ -578,6 +584,7 @@ export const useGameStore = create<GameState>((set, get) => {
     // Navigation
     screen: "title",
     overlayReturnScreen: "title",
+    studioInteractive: false,
     setScreen: (screen) => set((state) => {
       if (screen === "title" || screen === "game") {
         return { screen, overlayReturnScreen: screen };
