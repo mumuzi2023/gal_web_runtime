@@ -1,5 +1,7 @@
+import { useRef } from "react";
 import { useGameStore } from "../store";
 import { panelStyle } from "../uiConfig";
+import { SKIN_SAFE_PRESETS, useSkinGeometryVariables } from "../skinGeometry";
 
 export default function ChapterTitle() {
   const show = useGameStore((s) => s.showChapterTitle);
@@ -7,6 +9,8 @@ export default function ChapterTitle() {
   const subtitle = useGameStore((s) => s.chapterSubtitle);
   const dismiss = useGameStore((s) => s.dismissChapterTitle);
   const chapterStyle = useGameStore((s) => (s.gameData?.ui || s.gameData?.config?.ui)?.pages?.system?.chapterCard);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const geometry = useSkinGeometryVariables(cardRef, chapterStyle?.skin, show, SKIN_SAFE_PRESETS.systemCard);
 
   if (!show) return null;
 
@@ -17,7 +21,7 @@ export default function ChapterTitle() {
       onClick={dismiss}
       aria-label="关闭章节标题"
     >
-      <div className="chapter-card ui-responsive-skin" style={panelStyle(chapterStyle, {})}>
+      <div ref={cardRef} className={`chapter-card ui-responsive-skin ${chapterStyle?.skin ? "has-ui-skin" : ""}`} style={{ ...panelStyle(chapterStyle, {}), ...geometry }}>
         <h1 className="animate-[fadeSlideIn_0.8s_ease-out]">
           {title}
         </h1>

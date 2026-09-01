@@ -1,6 +1,7 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, type CSSProperties } from "react";
 import { useGameStore } from "../store";
 import { resolveAssetUrl } from "../assets";
+import { SKIN_SAFE_PRESETS, useSkinGeometryVariables } from "../skinGeometry";
 import {
   defaultLightPanel,
   panelOverlayStyle,
@@ -16,20 +17,29 @@ export default function BacklogPanel() {
   const backlog = useGameStore((s) => s.backlog);
   const gameData = useGameStore((s) => s.gameData);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const surfaceRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [backlog.length]);
 
-  if (screen !== "backlog") return null;
-
   const ui = gameData?.ui || gameData?.config?.ui;
   const pageCfg = ui?.pages?.backlog;
   const surfaceCfg = resolvePanelUi(ui, "backlog");
+  const surfaceGeometry = useSkinGeometryVariables(surfaceRef, surfaceCfg?.skin, screen, SKIN_SAFE_PRESETS.panel);
+
+  if (screen !== "backlog") return null;
   const surfaceCss = panelStyle(surfaceCfg, defaultLightPanel);
   const overlayCss = panelOverlayStyle(surfaceCfg, defaultLightPanel);
   const pageCss = responsiveSkinStyle(pageCfg?.pageBackground);
-  const entryCss = pageCfg?.entry ? panelStyle(pageCfg.entry, {}) : undefined;
+  const backlogLayout = pageCfg?.layout;
+  const listCss = {
+    "--backlog-list-inset": backlogLayout?.contentInset || "0px",
+    "--backlog-row-gap": backlogLayout?.rowGap || "4px",
+    "--backlog-avatar-size": backlogLayout?.avatarSize || "36px",
+  } as CSSProperties;
+  const showAvatars = backlogLayout?.showAvatars !== false;
+  const inlineSpeaker = backlogLayout?.speakerLayout === "inline";
 
   const resolveAvatar = (charKey: string | undefined, outfitId?: string): string => {
     if (!charKey || !gameData) return "";
@@ -55,7 +65,7 @@ export default function BacklogPanel() {
   return (
     <div className="runtime-overlay ui-responsive-skin" style={pageCss} role="dialog" aria-modal="true" aria-labelledby="backlog-title">
       <div className="runtime-overlay__scrim" style={overlayCss} />
-      <section className={`runtime-overlay__surface backlog-surface ui-responsive-skin ${surfaceCfg?.skin || surfaceCfg?.backgroundImage ? "has-ui-skin" : ""}`} style={surfaceCss}>
+      <section ref={surfaceRef} className={`runtime-overlay__surface backlog-surface ui-responsive-skin ${surfaceCfg?.skin || surfaceCfg?.backgroundImage ? "has-ui-skin" : ""}`} style={{ ...surfaceCss, ...surfaceGeometry }}>
         <header className="runtime-overlay__header">
           <div>
             <h2 id="backlog-title" className="runtime-overlay__title">对话记录</h2>
@@ -64,21 +74,19 @@ export default function BacklogPanel() {
           <button onClick={closeOverlay} className="runtime-overlay__close" aria-label="关闭记录">✕</button>
         </header>
 
-        <div className="runtime-overlay__body backlog-scroll backlog-list">
+        <div className="runtime-overlay__body backlog-scroll backlog-list" style={listCss}>
           {backlog.length === 0 ? (
             <p className="text-gray-400 text-center mt-8">暂无记录</p>
           ) : (
-            <div className="space-y-1">
+            <div className="backlog-entries">
               {backlog.map((entry, i) => (
-                <div key={i}>
+                <div key={i} className="backlog-entry-wrap">
                   {needsSeparator(i) && (
-                    <div className="flex items-center my-3">
-                      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
-                    </div>
+                    <div className="backlog-separator" aria-hidden="true" />
                   )}
-                  <article className="backlog-entry ui-responsive-skin" style={entryCss}>
-                    {entry.character ? (
-                      <div className="flex-shrink-0 w-10 h-10 rounded-full overflow-hidden border-2 border-gray-200 bg-gray-100">
+                  <article className="backlog-entry">
+                    {showAvatars && (entry.character ? (
+                      <div className="backlog-entry__avatar">
                         {resolveAvatar(entry.character, entry.outfitId) ? (
                           <img
                             src={resolveAvatar(entry.character, entry.outfitId)}
@@ -93,24 +101,24 @@ export default function BacklogPanel() {
                         )}
                       </div>
                     ) : (
-                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-400 text-sm">
+                      <div className="backlog-entry__avatar backlog-entry__avatar--narration">
                         ✦
                       </div>
-                    )}
+                    ))}
 
-                    <div className="backlog-entry__copy">
+                    <div className={`backlog-entry__copy ${inlineSpeaker ? "is-inline" : ""}`}>
                       {entry.characterName ? (
                         <>
                           <span
-                            className="font-bold mr-2"
+                            className="backlog-entry__speaker"
                             style={{ color: entry.characterColor || "#333" }}
                           >
                             {entry.characterName}
                           </span>
-                          <span className="text-gray-700">{entry.text}</span>
+                          <span className="backlog-entry__text">{entry.text}</span>
                         </>
                       ) : (
-                        <span className="text-gray-500 italic">{entry.text}</span>
+                        <span className="backlog-entry__text backlog-entry__text--narration">{entry.text}</span>
                       )}
                     </div>
                     {entry.voice && (

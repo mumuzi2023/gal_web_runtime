@@ -7,7 +7,9 @@ import {
   responsiveSkinStyle,
 } from "../uiConfig";
 import type { CSSProperties } from "react";
+import { useRef } from "react";
 import { resolveAssetUrl } from "../assets";
+import { SKIN_SAFE_PRESETS, useSkinGeometryVariables } from "../skinGeometry";
 
 export default function SaveLoadScreen() {
   const screen = useGameStore((s) => s.screen);
@@ -16,20 +18,28 @@ export default function SaveLoadScreen() {
   const saveGame = useGameStore((s) => s.saveGame);
   const loadGame = useGameStore((s) => s.loadGame);
   const gameData = useGameStore((s) => s.gameData);
+  const ui = gameData?.ui || gameData?.config?.ui;
+  const pageCfg = ui?.pages?.saveLoad;
+  const surfaceCfg = resolvePanelUi(ui, "saveLoad");
+  const surfaceRef = useRef<HTMLElement>(null);
+  const slotRef = useRef<HTMLButtonElement>(null);
+  const surfaceGeometry = useSkinGeometryVariables(surfaceRef, surfaceCfg?.skin, screen, SKIN_SAFE_PRESETS.panel);
+  const slotGeometry = useSkinGeometryVariables(slotRef, pageCfg?.slot?.skin, screen, SKIN_SAFE_PRESETS.saveSlot);
 
   if (screen !== "save" && screen !== "load") return null;
 
   const isSave = screen === "save";
-  const ui = gameData?.ui || gameData?.config?.ui;
-  const pageCfg = ui?.pages?.saveLoad;
-  const surfaceCfg = resolvePanelUi(ui, "saveLoad");
   const surfaceCss = panelStyle(surfaceCfg, defaultLightPanel);
   const overlayCss = panelOverlayStyle(surfaceCfg, defaultLightPanel);
   const pageCss = responsiveSkinStyle(pageCfg?.pageBackground);
   const slotCss = pageCfg?.slot ? panelStyle(pageCfg.slot, {}) : undefined;
+  const desktopColumns = Math.max(1, pageCfg?.desktopColumns || 4);
+  const mobileColumns = Math.max(1, pageCfg?.mobileColumns || 2);
   const layoutCss = {
-    "--save-columns-desktop": String(pageCfg?.desktopColumns || 4),
-    "--save-columns-mobile": String(pageCfg?.mobileColumns || 2),
+    "--save-columns-desktop": String(desktopColumns),
+    "--save-columns-mobile": String(mobileColumns),
+    "--save-slot-width-desktop": `calc((100% - ${(desktopColumns - 1) * 14}px) / ${desktopColumns})`,
+    "--save-slot-width-mobile": `calc((100% - ${(mobileColumns - 1) * 9}px) / ${mobileColumns})`,
     "--save-thumbnail-ratio": pageCfg?.thumbnailRatio || "16 / 9",
   } as CSSProperties;
   const handleSlotClick = (slotId: number) => {
@@ -58,7 +68,7 @@ export default function SaveLoadScreen() {
   return (
     <div className="runtime-overlay ui-responsive-skin" style={pageCss} role="dialog" aria-modal="true" aria-labelledby="save-load-title">
       <div className="runtime-overlay__scrim" style={overlayCss} />
-      <section className={`runtime-overlay__surface save-load-surface ui-responsive-skin ${surfaceCfg?.skin || surfaceCfg?.backgroundImage ? "has-ui-skin" : ""}`} style={surfaceCss}>
+      <section ref={surfaceRef} className={`runtime-overlay__surface save-load-surface ui-responsive-skin ${surfaceCfg?.skin || surfaceCfg?.backgroundImage ? "has-ui-skin" : ""}`} style={{ ...surfaceCss, ...surfaceGeometry }}>
         <header className="runtime-overlay__header">
           <div>
             <h2 id="save-load-title" className="runtime-overlay__title">{isSave ? "保存进度" : "读取进度"}</h2>
@@ -70,14 +80,15 @@ export default function SaveLoadScreen() {
         <div className="runtime-overlay__body save-slot-grid backlog-scroll" style={layoutCss}>
           {saves.map((slot, i) => (
             <button
+              ref={i === 0 ? slotRef : undefined}
               key={i}
               onClick={() => handleSlotClick(i)}
-              className={`save-slot ui-responsive-skin ${
+              className={`save-slot ui-responsive-skin ${pageCfg?.slot?.skin ? "has-ui-skin" : ""} ${
                 slot
                   ? "save-slot--filled"
                   : "save-slot--empty"
               } ${!slot && !isSave ? "save-slot--disabled" : ""}`}
-              style={slotCss}
+              style={{ ...slotCss, ...slotGeometry }}
               disabled={!slot && !isSave}
             >
               {/* Thumbnail area */}

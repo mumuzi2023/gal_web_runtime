@@ -1,4 +1,6 @@
+import { useRef } from "react";
 import { useGameStore } from "../store";
+import { SKIN_SAFE_PRESETS, useSkinGeometryVariables } from "../skinGeometry";
 import { panelOverlayStyle, panelStyle, defaultLightPanel, resolvePanelUi, responsiveSkinStyle } from "../uiConfig";
 
 export default function SettingsPanel() {
@@ -9,11 +11,12 @@ export default function SettingsPanel() {
   const settings = useGameStore((s) => s.settings);
   const updateSettings = useGameStore((s) => s.updateSettings);
   const gameData = useGameStore((s) => s.gameData);
-
-  if (screen !== "settings") return null;
-
   const ui = gameData?.ui || gameData?.config?.ui;
   const panelCfg = resolvePanelUi(ui, "settings");
+  const panelRef = useRef<HTMLElement>(null);
+  const panelGeometry = useSkinGeometryVariables(panelRef, panelCfg?.skin, screen, SKIN_SAFE_PRESETS.settings);
+
+  if (screen !== "settings") return null;
   const panelCss = panelStyle(panelCfg, defaultLightPanel);
   const overlayCss = panelOverlayStyle(panelCfg, defaultLightPanel);
   const allowThemeChoice = ui?.global?.allowPlayerThemeChoice !== false;
@@ -22,7 +25,7 @@ export default function SettingsPanel() {
   return (
     <div className="runtime-overlay ui-responsive-skin" style={pageCss} role="dialog" aria-modal="true" aria-labelledby="settings-title">
       <div className="runtime-overlay__scrim" style={overlayCss} />
-      <section className={`runtime-overlay__surface settings-surface ui-responsive-skin ${panelCfg?.skin || panelCfg?.backgroundImage ? "has-ui-skin" : ""}`} style={panelCss}>
+      <section ref={panelRef} className={`runtime-overlay__surface settings-surface ui-responsive-skin ${panelCfg?.skin || panelCfg?.backgroundImage ? "has-ui-skin" : ""}`} style={{ ...panelCss, ...panelGeometry }}>
         <header className="runtime-overlay__header">
           <div>
             <h2 id="settings-title" className="runtime-overlay__title">设置</h2>

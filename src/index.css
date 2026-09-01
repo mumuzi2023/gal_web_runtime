@@ -288,8 +288,39 @@ button:focus-visible, input:focus-visible {
 .title-menu-button { font-family: var(--runtime-font-ui); }
 
 .ui-responsive-skin {
-  background-image: var(--ui-skin-background-desktop, none) !important;
-  border-image-source: var(--ui-skin-border-desktop, none) !important;
+  /* Custom properties inherit by default.  Every skinnable element must own
+     an explicit empty value, otherwise an unskinned child (save slot,
+     backlog row, ending card, …) accidentally paints its parent's artwork. */
+  --ui-skin-background-desktop: none;
+  --ui-skin-background-mobile: none;
+  --ui-skin-visible-top: 0px;
+  --ui-skin-visible-right: 0px;
+  --ui-skin-visible-bottom: 0px;
+  --ui-skin-visible-left: 0px;
+  --ui-skin-safe-top: 0px;
+  --ui-skin-safe-right: 0px;
+  --ui-skin-safe-bottom: 0px;
+  --ui-skin-safe-left: 0px;
+  --ui-skin-aspect: auto;
+  --ui-skin-position: center;
+  --ui-skin-size: contain;
+  --ui-skin-opacity: 1;
+  --runtime-dialog-toolbar-right: 0px;
+  position: relative;
+  isolation: isolate;
+  background-image: none !important;
+}
+.ui-responsive-skin::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: var(--ui-skin-background-desktop, none);
+  background-position: var(--ui-skin-position, center);
+  background-size: var(--ui-skin-size, contain);
+  background-repeat: no-repeat;
+  opacity: var(--ui-skin-opacity, 1);
 }
 
 .runtime-stage { user-select: none; }
@@ -328,6 +359,16 @@ button:focus-visible, input:focus-visible {
   background: var(--runtime-surface);
   box-shadow: var(--runtime-panel-shadow);
   backdrop-filter: blur(24px);
+}
+.runtime-loading__panel.has-ui-skin,
+.runtime-error-card.has-ui-skin {
+  aspect-ratio: var(--ui-skin-aspect, auto);
+  box-sizing: border-box;
+  padding:
+    max(24px, var(--ui-skin-safe-top, 0px))
+    max(24px, var(--ui-skin-safe-right, 0px))
+    max(24px, var(--ui-skin-safe-bottom, 0px))
+    max(24px, var(--ui-skin-safe-left, 0px));
 }
 
 .runtime-loading__eyebrow {
@@ -423,9 +464,12 @@ button:focus-visible, input:focus-visible {
 .character-stage { z-index: 2; pointer-events: none; }
 .character-sprite {
   position: absolute;
-  bottom: clamp(170px, 23dvh, 260px);
-  width: min(42vw, 560px);
-  height: min(80dvh, 860px);
+  /* Full-body assets stand on the stage floor behind the dialogue layer.
+     Oversizing and lowering the sprite makes the dialogue panel crop roughly
+     its lower half, which is the conventional visual-novel composition. */
+  bottom: -38dvh;
+  width: min(48vw, 720px);
+  height: 136dvh;
   transform: translateX(-50%);
   transform-origin: bottom center;
   transition: filter 320ms ease, opacity 320ms ease, transform 320ms ease;
@@ -522,7 +566,10 @@ button:focus-visible, input:focus-visible {
 .dialog-toolbar {
   position: absolute;
   top: calc(-1 * var(--runtime-dialog-frame-top, 0px) + 10px);
-  right: calc(-1 * var(--runtime-dialog-frame-right, 0px) + 14px);
+  right: max(
+    calc(-1 * var(--runtime-dialog-frame-right, 0px) + var(--runtime-dialog-visible-right, 0px) + 14px),
+    var(--ui-skin-safe-right, 14px)
+  );
   left: auto;
   display: flex;
   justify-content: flex-end;
@@ -546,6 +593,31 @@ button:focus-visible, input:focus-visible {
   font-size: var(--runtime-text-caption);
   cursor: pointer;
   overflow: visible;
+}
+.dialog-tool-button[aria-pressed="true"] {
+  outline: 2px solid var(--runtime-accent);
+  outline-offset: 2px;
+  color: var(--runtime-active-text);
+}
+.dialog-tool-button__icon {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  pointer-events: none;
+}
+.dialog-tool-button__icon svg { display: block; width: 100%; height: 100%; }
+.dialog-tool-button__label { position: relative; z-index: 1; }
+.dialog-tool-button--icon-only {
+  width: var(--runtime-control-size) !important;
+  height: var(--runtime-control-size) !important;
+  min-width: var(--runtime-control-size) !important;
+  min-height: var(--runtime-control-size) !important;
+  padding: 0 !important;
+  display: grid;
+  place-items: center;
 }
 .dialog-tool-button[data-tooltip]:empty {
   min-width: 42px;
@@ -580,6 +652,7 @@ button:focus-visible, input:focus-visible {
   opacity: 1;
 }
 .dialog-copy {
+  margin-top: 8px;
   max-height: clamp(92px, 14dvh, 154px);
   overflow-y: auto;
   font-size: var(--runtime-text-body);
@@ -589,7 +662,7 @@ button:focus-visible, input:focus-visible {
   user-select: text;
 }
 .dialog-cursor { color: var(--runtime-accent); }
-.dialog-continue { position: absolute; right: 22px; bottom: 13px; color: var(--runtime-accent); font-size: var(--runtime-icon-size); }
+.dialog-continue { position: absolute; right: max(22px, var(--ui-skin-safe-right, 0px)); bottom: max(13px, var(--ui-skin-safe-bottom, 0px)); color: var(--runtime-accent); font-size: var(--runtime-icon-size); }
 
 /* Choices */
 .choice-layer {
@@ -603,7 +676,13 @@ button:focus-visible, input:focus-visible {
 .choice-scrim { position: absolute; inset: 0; background: var(--runtime-scrim); backdrop-filter: blur(4px); }
 .choice-list { position: relative; z-index: 1; display: grid; gap: 12px; width: clamp(320px, 48vw, 760px); max-width: 100%; max-height: 78dvh; overflow-y: auto; padding: 8px; }
 .choice-list .choice-btn {
-  width: 100%;
+  /* Project styles may carry an explicit desktop width. The list is the
+     authoritative available area; never let that inline value overflow and
+     get clipped by the scroll container. */
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+  justify-self: center;
   min-height: var(--runtime-control-size);
   padding: 14px 24px;
   border-radius: calc(var(--runtime-panel-radius) * 0.7);
@@ -641,7 +720,19 @@ button:focus-visible, input:focus-visible {
   background: var(--runtime-surface);
   box-shadow: var(--runtime-panel-shadow);
 }
+.runtime-overlay__surface.has-ui-skin {
+  box-sizing: border-box;
+  aspect-ratio: var(--ui-skin-aspect, auto);
+  padding:
+    var(--ui-skin-safe-top, 0px)
+    var(--ui-skin-safe-right, 0px)
+    var(--ui-skin-safe-bottom, 0px)
+    var(--ui-skin-safe-left, 0px);
+}
 .runtime-overlay__header { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: calc(var(--runtime-control-size) + 16px); padding: 12px 20px; border-bottom: 1px solid var(--runtime-line); }
+.runtime-overlay__surface.has-ui-skin .runtime-overlay__header {
+  padding: 12px 20px;
+}
 .runtime-overlay__title { margin: 0; font-size: var(--runtime-text-heading); font-weight: 700; letter-spacing: .05em; }
 .runtime-overlay__subtitle { color: var(--runtime-text-muted); font-size: var(--runtime-text-caption); }
 .runtime-overlay__close, .runtime-icon-button {
@@ -675,9 +766,10 @@ button:focus-visible, input:focus-visible {
 .settings-actions__primary { color: var(--runtime-active-text); background: var(--runtime-active-bg); }
 
 .save-load-surface { width: clamp(820px, 78vw, 1360px); max-width: 100%; height: min(100%, 880px); }
-.save-slot-grid { display: grid; grid-template-columns: repeat(var(--save-columns-desktop, 4), minmax(0, 1fr)); align-content: start; gap: 14px; }
+.save-slot-grid { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 14px; }
 .save-slot {
   display: flex;
+  flex: 0 0 var(--save-slot-width-desktop, calc((100% - 42px) / 4));
   flex-direction: column;
   min-width: 0;
   min-height: 188px;
@@ -691,10 +783,20 @@ button:focus-visible, input:focus-visible {
   cursor: pointer;
   transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
 }
+.save-slot.has-ui-skin {
+  aspect-ratio: var(--ui-skin-aspect, 1 / 1);
+  min-height: auto;
+  box-sizing: border-box;
+  padding:
+    var(--ui-skin-safe-top, 0px)
+    var(--ui-skin-safe-right, 0px)
+    var(--ui-skin-safe-bottom, 0px)
+    var(--ui-skin-safe-left, 0px);
+}
 .save-slot:not(:disabled):hover { transform: translateY(-2px); border-color: var(--runtime-accent); background: var(--runtime-button-hover); }
 .save-slot--empty { border-style: dashed; }
 .save-slot--disabled { opacity: .38; cursor: not-allowed; }
-.save-slot__preview { position: relative; width: 100%; aspect-ratio: var(--save-thumbnail-ratio, 16 / 9); overflow: hidden; background: linear-gradient(145deg, #e7ece9, #d8e1dd); }
+.save-slot__preview { position: relative; width: 100%; aspect-ratio: var(--save-thumbnail-ratio, 16 / 9); overflow: hidden; border-radius: calc(var(--runtime-panel-radius) * .58) calc(var(--runtime-panel-radius) * .58) 0 0; background: linear-gradient(145deg, #e7ece9, #d8e1dd); }
 .save-slot__preview > img { width: 100%; height: 100%; object-fit: cover; opacity: .78; }
 .save-slot__info { flex: 1; min-width: 0; padding: 11px 12px 13px; }
 .save-slot__meta { display: flex; justify-content: space-between; gap: 8px; color: var(--runtime-text-secondary); font-size: var(--runtime-text-caption); }
@@ -704,16 +806,64 @@ button:focus-visible, input:focus-visible {
 .save-slot__description { margin-top: 3px; color: var(--runtime-text-muted); font-size: var(--runtime-text-caption); }
 .save-slot__empty-label { display: grid; min-height: 38px; place-items: center; color: var(--runtime-text-muted); font-size: var(--runtime-text-caption); }
 
-.backlog-surface { width: clamp(680px, 62vw, 1080px); max-width: 100%; height: min(100%, 860px); }
-.backlog-list { padding-inline: clamp(14px, 4vw, 42px); }
-.backlog-entry { display: flex; align-items: flex-start; gap: 13px; padding: 12px 8px; border-radius: 12px; }
-.backlog-entry:hover { background: var(--runtime-button-hover); }
-.backlog-entry__copy { flex: 1; min-width: 0; color: var(--runtime-text-secondary); font-size: var(--runtime-text-ui); line-height: 1.75; user-select: text; }
+.backlog-surface { width: clamp(760px, 70vw, 1180px); max-width: 100%; height: min(78dvh, 700px); }
+.backlog-surface.has-ui-skin {
+  /* A generated edge ornament must not turn into a large text indent.  Older
+     projects stored the selected left-edge authoring marker as a 12% safe
+     inset; cap that estimate while still respecting the detected frame. */
+  height: auto;
+  max-height: min(82dvh, 700px);
+  padding-left: max(var(--ui-skin-visible-left, 0px), min(var(--ui-skin-safe-left, 0px), 6%));
+}
+.backlog-list { padding-inline: var(--backlog-list-inset, 0px); }
+.backlog-entries { display: flex; flex-direction: column; gap: var(--backlog-row-gap, 6px); }
+.backlog-entry-wrap { min-width: 0; }
+.backlog-separator { height: 1px; margin: 7px 0 9px; background: linear-gradient(90deg, transparent, var(--runtime-line) 12%, var(--runtime-line) 88%, transparent); }
+.backlog-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+  min-height: calc(var(--backlog-avatar-size, 38px) + 12px);
+  padding: 7px 2px;
+  background: transparent;
+}
+.backlog-entry:hover .backlog-entry__text { color: var(--runtime-text-primary); }
+.backlog-entry__avatar {
+  display: grid;
+  flex: 0 0 var(--backlog-avatar-size, 38px);
+  width: var(--backlog-avatar-size, 38px);
+  height: var(--backlog-avatar-size, 38px);
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--runtime-line);
+  border-radius: 50%;
+  color: var(--runtime-text-muted);
+  background: var(--runtime-surface-raised);
+  font-size: var(--runtime-text-caption);
+}
+.backlog-entry__avatar--narration { border-color: transparent; background: var(--runtime-button-bg); }
+.backlog-entry__copy { flex: 1; min-width: 0; color: var(--runtime-text-secondary); font-size: var(--runtime-text-ui); line-height: 1.72; user-select: text; }
+.backlog-entry__speaker { display: block; margin-bottom: 2px; font-size: var(--runtime-text-caption); font-weight: 700; line-height: 1.35; }
+.backlog-entry__copy.is-inline .backlog-entry__speaker { display: inline; margin: 0 9px 0 0; font-size: inherit; line-height: inherit; }
+.backlog-entry__text { overflow-wrap: anywhere; white-space: pre-wrap; }
+.backlog-entry__text--narration { color: var(--runtime-text-muted); font-style: italic; }
 .backlog-entry__voice { flex: 0 0 auto; display: grid; place-items: center; width: var(--runtime-control-size); height: var(--runtime-control-size); border: 1px solid rgba(215,190,139,.22); border-radius: 50%; color: #dec898; background: rgba(142,113,59,.12); font-size: var(--runtime-icon-size); cursor: pointer; }
 
 .endings-surface { width: clamp(620px, 52vw, 920px); max-width: 100%; }
 .endings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .ending-card { display: flex; align-items: center; gap: 16px; min-height: 94px; padding: 16px; border: 1px solid var(--runtime-line); border-radius: calc(var(--runtime-panel-radius) * 0.7); background: var(--runtime-button-bg); }
+.ending-card.has-ui-skin {
+  aspect-ratio: var(--ui-skin-aspect, auto);
+  min-height: 0;
+  box-sizing: border-box;
+  padding:
+    max(14px, var(--ui-skin-safe-top, 0px))
+    max(16px, var(--ui-skin-safe-right, 0px))
+    max(14px, var(--ui-skin-safe-bottom, 0px))
+    max(16px, var(--ui-skin-safe-left, 0px));
+}
+.endings-surface.has-ui-skin .runtime-overlay__body { padding: 10px 12px; }
 .ending-card--reached { border-color: rgba(138,103,47,.36); background: linear-gradient(135deg, rgba(214,190,142,.22), var(--runtime-button-bg)); }
 .ending-card--locked { opacity: .56; }
 .ending-card__icon { display: grid; flex: 0 0 auto; place-items: center; width: var(--runtime-control-size); height: var(--runtime-control-size); border-radius: 50%; color: #efc67d; background: rgba(234,183,90,.1); font-size: var(--runtime-icon-size); }
@@ -724,6 +874,9 @@ button:focus-visible, input:focus-visible {
 .flow-overlay { padding: max(10px, var(--runtime-safe-top)) max(10px, var(--runtime-safe-right)) max(10px, var(--runtime-safe-bottom)) max(10px, var(--runtime-safe-left)); }
 .flow-surface { width: 100%; height: 100%; max-height: none; border-radius: var(--runtime-panel-radius); background: rgba(8, 12, 13, .96); }
 .flow-header { position: relative; flex: 0 0 auto; }
+.flow-surface.has-ui-skin .flow-header {
+  padding-inline: 20px;
+}
 .flow-toolbar { display: flex; gap: 6px; }
 .flow-toolbar button {
   min-width: var(--runtime-control-size);
@@ -870,6 +1023,18 @@ button:focus-visible, input:focus-visible {
 /* Chapter card */
 .chapter-card-layer { position: absolute; inset: 0; z-index: 40; display: grid; place-items: center; padding: 24px; background: rgba(4,7,8,.66); backdrop-filter: blur(8px); cursor: pointer; }
 .chapter-card { max-width: 760px; text-align: center; }
+.chapter-card.has-ui-skin {
+  width: min(92vw, 760px);
+  aspect-ratio: var(--ui-skin-aspect, auto);
+  box-sizing: border-box;
+  display: grid;
+  align-content: center;
+  padding:
+    max(20px, var(--ui-skin-safe-top, 0px))
+    max(24px, var(--ui-skin-safe-right, 0px))
+    max(20px, var(--ui-skin-safe-bottom, 0px))
+    max(24px, var(--ui-skin-safe-left, 0px));
+}
 .chapter-card h1 { margin: 0; font-size: var(--runtime-text-display); line-height: 1.15; letter-spacing: .09em; text-shadow: 0 10px 42px rgba(0,0,0,.6); }
 .chapter-card p { margin: 14px 0 0; color: rgba(239,244,255,.68); font-size: var(--runtime-text-body); letter-spacing: .06em; }
 
@@ -985,16 +1150,15 @@ button:focus-visible, input:focus-visible {
 
 /* Phone and compact windows */
 @media (max-width: 700px) {
-  .ui-responsive-skin {
+  .ui-responsive-skin::before {
     background-image: var(--ui-skin-background-mobile, var(--ui-skin-background-desktop, none)) !important;
-    border-image-source: var(--ui-skin-border-mobile, var(--ui-skin-border-desktop, none)) !important;
   }
   .flow-node__skin--desktop { display: none; }
   .flow-node__skin--mobile { display: block; }
   .character-sprite {
-    bottom: clamp(210px, 31dvh, 300px);
-    width: min(76vw, 470px);
-    height: min(66dvh, 650px);
+    bottom: -28dvh;
+    width: min(88vw, 560px);
+    height: 112dvh;
   }
   .dialog-panel {
     bottom: max(8px, var(--runtime-safe-bottom));
@@ -1008,8 +1172,17 @@ button:focus-visible, input:focus-visible {
       max(18px, var(--ui-skin-safe-left, 0px));
     border-radius: var(--runtime-panel-radius);
   }
-  .dialog-nameplate { left: calc(-1 * var(--runtime-dialog-frame-left, 0px) + 14px); min-width: 96px; max-width: 44vw; padding-inline: 14px; }
-  .dialog-toolbar { left: auto; right: calc(-1 * var(--runtime-dialog-frame-right, 0px) + 8px); max-width: calc(100% - 104px); gap: 4px; }
+  .dialog-nameplate {
+    /* Anchor calculations are emitted inline from the project config. On a
+       phone the five-icon toolbar needs the first row above the copy, so the
+       nameplate gets its own row above it. */
+    top: calc(var(--runtime-dialog-visible-top, 0px) - 62px) !important;
+    left: calc(var(--runtime-dialog-visible-left, 0px) + 14px);
+    min-width: 96px;
+    max-width: 44vw;
+    padding-inline: 14px;
+  }
+  .dialog-toolbar { left: auto; right: calc(var(--runtime-dialog-visible-right, 0px) + 8px); max-width: calc(100% - 104px); gap: 4px; }
   .dialog-tool-button { min-width: calc(var(--runtime-control-size) + 6px); min-height: var(--runtime-control-size); padding-inline: 8px; font-size: var(--runtime-text-caption); }
   .dialog-copy { max-height: min(20dvh, 150px); font-size: var(--runtime-text-body); line-height: 1.72; }
   .choice-list { max-height: 86dvh; padding: 4px; }
@@ -1032,16 +1205,31 @@ button:focus-visible, input:focus-visible {
   .runtime-overlay__surface { width: 100%; height: 100%; max-height: none; }
   .runtime-overlay__surface:not(.has-ui-skin) { border-width: 0 !important; border-radius: 0 !important; }
   .runtime-overlay__header { min-height: 60px; padding-inline: 14px; }
+  .runtime-overlay__surface.has-ui-skin .runtime-overlay__header {
+    padding: 10px 14px;
+  }
   .runtime-overlay__body { padding: 14px; }
-  .save-slot-grid { grid-template-columns: repeat(var(--save-columns-mobile, 2), minmax(0, 1fr)); gap: 9px; }
-  .save-slot { min-height: 168px; }
+  .save-slot-grid { gap: 9px; }
+  .save-slot { flex-basis: var(--save-slot-width-mobile, calc((100% - 9px) / 2)); }
+  .save-slot:not(.has-ui-skin) { min-height: 168px; }
+  .save-slot.has-ui-skin .save-slot__info { padding: 5px 4px 3px; }
+  .save-slot.has-ui-skin.save-slot--empty .save-slot__empty-label { display: none; }
   .save-slot__meta time { display: none; }
   .endings-grid { grid-template-columns: 1fr; }
   .settings-actions { padding-bottom: max(14px, var(--runtime-safe-bottom)); }
   .flow-overlay { padding: var(--runtime-safe-top) var(--runtime-safe-right) var(--runtime-safe-bottom) var(--runtime-safe-left); }
   .flow-surface { border-radius: 0; }
-  .flow-header { align-items: flex-start; min-height: 108px; padding: 13px 12px; }
-  .flow-toolbar { position: absolute; right: 10px; bottom: 8px; }
+  .flow-header {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    min-height: 140px;
+    padding: 20px 16px 12px;
+  }
+  .flow-header > div:first-child { min-width: 0; text-align: center; }
+  .flow-header .runtime-overlay__subtitle { margin-top: 3px; line-height: 1.4; }
+  .flow-toolbar { position: static; align-self: center; margin-top: 8px; }
+  .flow-surface.has-ui-skin .flow-header { padding: 20px 16px 12px; }
   .flow-toolbar button { min-width: var(--runtime-control-size); min-height: var(--runtime-control-size); padding-inline: 10px; }
   .flow-legend { gap: 7px 12px; min-height: 66px; padding: 8px 12px; }
   .flow-legend em { flex-basis: 100%; margin-left: 0; }
@@ -1049,7 +1237,7 @@ button:focus-visible, input:focus-visible {
 }
 
 @media (max-height: 560px) and (orientation: landscape) {
-  .character-sprite { bottom: 156px; height: 78dvh; width: 40vw; }
+  .character-sprite { bottom: -38dvh; height: 136dvh; width: min(48vw, 720px); }
   .dialog-panel {
     min-height: 144px;
     max-height: 48dvh;
@@ -1059,8 +1247,8 @@ button:focus-visible, input:focus-visible {
       max(16px, var(--ui-skin-safe-bottom, 0px))
       max(22px, var(--ui-skin-safe-left, 0px));
   }
-  .dialog-nameplate { top: calc(-1 * var(--runtime-dialog-frame-top, 0px) - 17px); min-height: 38px; padding: 7px 14px; }
-  .dialog-toolbar { top: calc(-1 * var(--runtime-dialog-frame-top, 0px) + 5px); }
+  .dialog-nameplate { top: calc(var(--runtime-dialog-visible-top, 0px) - 17px); min-height: 38px; padding: 7px 14px; }
+  .dialog-toolbar { top: calc(var(--runtime-dialog-visible-top, 0px) + 5px); }
   .dialog-tool-button { min-height: max(40px, var(--runtime-control-size)); }
   .dialog-copy { max-height: 21dvh; line-height: 1.55; }
   .title-screen__content { padding-block: max(22px, var(--runtime-safe-top)) max(22px, var(--runtime-safe-bottom)); }

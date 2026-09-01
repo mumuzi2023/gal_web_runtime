@@ -107,43 +107,27 @@ export function responsiveSkinStyle(
   legacyImage?: string,
 ): UiCssProperties {
   const desktop = imageUrl(skin?.desktop || legacyImage);
-  const mobile = imageUrl(skin?.mobile || skin?.desktop || legacyImage);
+  // Desktop and mobile artwork have independent geometry.  Falling back to a
+  // desktop bitmap on a narrow canvas would resize the wrong asset.
+  const mobile = imageUrl(skin?.mobile || legacyImage);
   if (!desktop && !mobile) return {};
   const css: UiCssProperties = {
     "--ui-skin-desktop": desktop,
     "--ui-skin-mobile": mobile || desktop,
   };
-  const fit = skin?.fit || "cover";
-  if (fit === "nine-slice") {
-    css["--ui-skin-background-desktop"] = "none";
-    css["--ui-skin-background-mobile"] = "none";
-    css["--ui-skin-border-desktop"] = desktop;
-    css["--ui-skin-border-mobile"] = mobile || desktop;
-    const slice = skin?.nineSlice || {};
-    const values = [slice.top ?? 24, slice.right ?? 24, slice.bottom ?? 24, slice.left ?? 24];
-    const border = skin?.borderWidth || {};
-    const widths = [border.top ?? 18, border.right ?? 24, border.bottom ?? 18, border.left ?? 24];
-    css.borderStyle = "solid";
-    css.borderWidth = widths.map((value) => `${value}px`).join(" ");
-    css.borderImageSlice = `${values.join(" ")}${slice.fill ? " fill" : ""}`;
-    css.borderImageWidth = widths.map((value) => `${value}px`).join(" ");
-    const outset = skin?.outset;
-    if (outset && [outset.top, outset.right, outset.bottom, outset.left].some((value) => value !== undefined)) {
-      css.borderImageOutset = [outset.top, outset.right, outset.bottom, outset.left]
-        .map((value) => `${value ?? 0}px`)
-        .join(" ");
-    }
-    css.borderImageRepeat = "stretch";
-  } else {
-    css["--ui-skin-background-desktop"] = desktop;
-    css["--ui-skin-background-mobile"] = mobile || desktop;
-    css["--ui-skin-border-desktop"] = "none";
-    css["--ui-skin-border-mobile"] = "none";
-    css.backgroundPosition = skin?.position || "center";
-    css.backgroundSize = fit === "stretch" ? "100% 100%" : fit;
-    css.backgroundRepeat = fit === "tile" ? "repeat" : "no-repeat";
-  }
-  if (skin?.opacity !== undefined) css.opacity = skin.opacity;
+  // Generated UI artwork is never split, tiled or non-uniformly stretched.
+  // Old scalable-frame values are treated as `contain`, so legacy project
+  // data cannot silently re-enable the removed rendering path.
+  const fit = skin?.fit === "cover" ? "cover" : "contain";
+  css["--ui-skin-background-desktop"] = desktop;
+  css["--ui-skin-background-mobile"] = mobile || desktop;
+  css["--ui-skin-border-desktop"] = "none";
+  css["--ui-skin-border-mobile"] = "none";
+  css["--ui-skin-position"] = skin?.position || "center";
+  css["--ui-skin-size"] = fit;
+  // Opacity belongs to the bitmap layer only. Applying CSS opacity to the
+  // component also fades Runtime-owned text, thumbnails and controls.
+  css["--ui-skin-opacity"] = Math.max(0, Math.min(1, skin?.opacity ?? 1));
   const safe = skin?.safeArea;
   if (safe && [safe.top, safe.right, safe.bottom, safe.left].some((value) => value !== undefined)) {
     css["--ui-skin-safe-top"] = `${safe.top ?? 0}px`;
@@ -239,22 +223,28 @@ export function buttonStyle(
   fallback: UiButtonStyle,
 ): CSSProperties {
   const s: UiButtonStyle = { ...fallback, ...(override || {}) };
+  const skin = s.renderMode === "html" ? undefined : s.skin;
+  const legacyImage = s.renderMode === "html" ? undefined : s.backgroundImage;
   const css: CSSProperties = {};
-  if (s.background) css.backgroundColor = s.background;
-  Object.assign(css, responsiveSkinStyle(s.skin, s.backgroundImage));
-  if (s.skin) {
-    // The skin already owns the visual surface. CSS blur and the default panel
-    // shadow would otherwise create additional translucent layers around it.
+  Object.assign(css, responsiveSkinStyle(skin, legacyImage));
+  if (skin) {
+    // Image artwork owns the complete visual surface.  Never draw a second
+    // HTML box around it.
+    css.backgroundColor = "transparent";
+    css.border = "none";
+    css.borderRadius = 0;
     css.backdropFilter = "none";
     css.boxShadow = s.shadow || "none";
+  } else {
+    if (s.background) css.backgroundColor = s.background;
+    if (s.borderColor || s.borderWidth) {
+      css.border = `${s.borderWidth || "1px"} solid ${s.borderColor || "transparent"}`;
+    }
+    if (s.borderRadius) css.borderRadius = s.borderRadius;
   }
   if (s.textColor) css.color = s.textColor;
-  if (s.skin?.fit !== "nine-slice" && (s.borderColor || s.borderWidth)) {
-    css.border = `${s.borderWidth || "1px"} solid ${s.borderColor || "transparent"}`;
-  }
-  if (s.borderRadius) css.borderRadius = s.borderRadius;
   if (s.padding) css.padding = s.padding;
-  if (s.shadow) css.boxShadow = s.shadow;
+  if (s.shadow && !skin) css.boxShadow = s.shadow;
   if (s.fontFamily) css.fontFamily = s.fontFamily;
   if (s.fontWeight !== undefined) css.fontWeight = s.fontWeight;
   if (s.width) css.width = s.width;
@@ -268,6 +258,10 @@ export function buttonHoverStyle(
 ): CSSProperties {
   const s: UiButtonStyle = { ...fallback, ...(override || {}) };
   const css: CSSProperties = {};
+  if (s.renderMode === "image" && s.skin) {
+    if (s.hoverTextColor) css.color = s.hoverTextColor;
+    return css;
+  }
   // Do not use the `background` shorthand here: it resets a generated icon's
   // background-image, making the mark disappear as soon as the button hovers.
   if (s.hoverBackground) css.backgroundColor = s.hoverBackground;
@@ -283,17 +277,28 @@ export function panelStyle(
   fallback: UiPanelStyle,
 ): CSSProperties {
   const s: UiPanelStyle = { ...fallback, ...(override || {}) };
+  const skin = s.renderMode === "html" ? undefined : s.skin;
+  const legacyImage = s.renderMode === "html" ? undefined : s.backgroundImage;
   const css: CSSProperties = {};
-  if (s.background) css.backgroundColor = s.background;
-  Object.assign(css, responsiveSkinStyle(s.skin, s.backgroundImage));
-  if (s.skin) css.boxShadow = "none";
-  if (s.textColor) css.color = s.textColor;
-  if (s.skin?.fit !== "nine-slice" && (s.borderColor || s.borderWidth)) {
-    css.border = `${s.borderWidth || "1px"} solid ${s.borderColor || "transparent"}`;
+  Object.assign(css, responsiveSkinStyle(skin, legacyImage));
+  if (skin) {
+    css.backgroundColor = "transparent";
+    css.border = "none";
+    css.borderRadius = 0;
+    css.boxShadow = "none";
+    css.backdropFilter = "none";
+  } else {
+    if (s.background) css.backgroundColor = s.background;
+    if (s.borderColor || s.borderWidth) {
+      css.border = `${s.borderWidth || "1px"} solid ${s.borderColor || "transparent"}`;
+    }
+    if (s.borderRadius) css.borderRadius = s.borderRadius;
   }
-  if (s.borderRadius) css.borderRadius = s.borderRadius;
-  if (s.shadow) css.boxShadow = s.shadow;
-  if (s.padding) css.padding = s.padding;
+  if (s.textColor) css.color = s.textColor;
+  if (s.shadow && !skin) css.boxShadow = s.shadow;
+  // Keep fixed padding for the HTML renderer only.  Generated artwork is
+  // positioned from its detected visible/safe bounds at runtime.
+  if (s.padding && !skin) css.padding = s.padding;
   return css;
 }
 
@@ -312,10 +317,12 @@ export function textboxStyle(
   override: UiTextboxStyle | undefined,
 ): UiCssProperties {
   const s: UiTextboxStyle = { ...defaultTextbox, ...(override || {}) };
+  const skin = s.renderMode === "html" ? undefined : s.skin;
+  const legacyImage = s.renderMode === "html" ? undefined : s.backgroundImage;
   const css: UiCssProperties = {};
-  if (s.background || s.backgroundImage) {
+  if (!skin && (s.background || s.backgroundImage)) {
     if (s.background) css.backgroundColor = s.background;
-  } else {
+  } else if (!skin) {
     css.backgroundColor = `rgba(var(--runtime-dialog-rgb), ${s.opacity ?? 0.82})`;
   }
   // Never infer a border-image outset. The generated artwork should align to
@@ -323,30 +330,30 @@ export function textboxStyle(
   // ghost frame outside the selection and makes resize handles misleading.
   // Projects that deliberately need decoration outside the box can still set
   // skin.outset explicitly in the Studio inspector.
-  Object.assign(css, responsiveSkinStyle(s.skin, s.backgroundImage));
-  if (s.skin) {
+  Object.assign(css, responsiveSkinStyle(skin, legacyImage));
+  if (skin) {
+    // The generated asset owns both its outline and enclosed face. Drawing an
+    // HTML colour across the full layout rectangle creates a visibly larger
+    // second panel whenever `contain` leaves horizontal or vertical gutters.
+    css.backgroundColor = "transparent";
+    css.border = "none";
+    css.borderRadius = 0;
     css.backdropFilter = "none";
     css.boxShadow = s.shadow || "none";
   }
-  // Absolutely positioned children (nameplate and quick menu) are laid out
-  // from the dialogue panel's padding box.  A nine-slice border moves that
-  // origin inward, so expose the border thickness and compensate in CSS.
-  css["--runtime-dialog-frame-top"] = s.skin?.fit === "nine-slice"
-    ? `${s.skin.borderWidth?.top ?? 18}px`
-    : "0px";
-  css["--runtime-dialog-frame-right"] = s.skin?.fit === "nine-slice"
-    ? `${s.skin.borderWidth?.right ?? 24}px`
-    : "0px";
-  css["--runtime-dialog-frame-left"] = s.skin?.fit === "nine-slice"
-    ? `${s.skin.borderWidth?.left ?? 24}px`
-    : "0px";
-  if (s.skin?.fit !== "nine-slice" && s.borderColor) css.border = `1px solid ${s.borderColor}`;
-  if (s.borderRadius) css.borderRadius = s.borderRadius;
+  css["--runtime-dialog-frame-top"] = "0px";
+  css["--runtime-dialog-frame-right"] = "0px";
+  css["--runtime-dialog-frame-left"] = "0px";
+  if (!skin && s.borderColor) css.border = `1px solid ${s.borderColor}`;
+  if (!skin && s.borderRadius) css.borderRadius = s.borderRadius;
   if (s.textColor) css.color = s.textColor;
   if (s.fontFamily) css.fontFamily = s.fontFamily;
   if (s.fontSize) css.fontSize = s.fontSize;
-  if (s.shadow) css.boxShadow = s.shadow;
-  if (s.padding) css.padding = s.padding;
+  if (s.shadow && !skin) css.boxShadow = s.shadow;
+  // Image skins use edge-detected/saved safe bounds for their content box.
+  // An old fixed padding would override that geometry and push dialogue copy
+  // back onto the transparent gutter or painted frame.
+  if (s.padding && !skin) css.padding = s.padding;
   if (s.width) css.width = s.width;
   if (s.height) css.height = s.height;
   if (s.minHeight) css.minHeight = s.minHeight;
@@ -360,16 +367,22 @@ export function nameplateStyle(
   characterColor: string | null,
 ): CSSProperties {
   const s: UiNameplateStyle = { ...defaultNameplate, ...(override || {}) };
+  const skin = s.renderMode === "html" ? undefined : s.skin;
+  const legacyImage = s.renderMode === "html" ? undefined : s.backgroundImage;
   const color = s.textColor || characterColor || "var(--runtime-text-primary)";
   const css: CSSProperties = { color };
-  if (s.skin?.fit !== "nine-slice") css.borderTop = `2px solid ${color}`;
-  if (s.background) css.backgroundColor = s.background;
-  else css.backgroundColor = "var(--runtime-surface-raised)";
-  Object.assign(css, responsiveSkinStyle(s.skin, s.backgroundImage));
-  if (s.skin) css.boxShadow = "none";
-  if (s.skin?.fit !== "nine-slice" && s.borderColor && s.borderWidth)
-    css.border = `${s.borderWidth} solid ${s.borderColor}`;
-  if (s.borderRadius) css.borderRadius = s.borderRadius;
+  Object.assign(css, responsiveSkinStyle(skin, legacyImage));
+  if (skin) {
+    css.backgroundColor = "transparent";
+    css.border = "none";
+    css.borderRadius = 0;
+    css.boxShadow = "none";
+  } else {
+    css.borderTop = `2px solid ${color}`;
+    css.backgroundColor = s.background || "var(--runtime-surface-raised)";
+    if (s.borderColor && s.borderWidth) css.border = `${s.borderWidth} solid ${s.borderColor}`;
+    if (s.borderRadius) css.borderRadius = s.borderRadius;
+  }
   if (s.fontFamily) css.fontFamily = s.fontFamily;
   if (s.fontWeight !== undefined) css.fontWeight = s.fontWeight;
   if (s.padding) css.padding = s.padding;
@@ -377,26 +390,26 @@ export function nameplateStyle(
     css.bottom = "auto";
     css.transform = "none";
     if (s.anchor === "top-left") {
-      css.top = "calc(-1 * var(--runtime-dialog-frame-top, 0px) - 22px)";
-      css.left = "calc(-1 * var(--runtime-dialog-frame-left, 0px) + 54px)";
+      css.top = "calc(var(--runtime-dialog-visible-top, 0px) - 22px)";
+      css.left = "calc(var(--runtime-dialog-visible-left, 0px) + 54px)";
       css.right = "auto";
     } else if (s.anchor === "top-center") {
-      css.top = "calc(-1 * var(--runtime-dialog-frame-top, 0px) - 22px)";
+      css.top = "calc(var(--runtime-dialog-visible-top, 0px) - 22px)";
       css.left = "50%";
       css.right = "auto";
       css.transform = "translateX(-50%)";
     } else if (s.anchor === "top-right") {
-      css.top = "calc(-1 * var(--runtime-dialog-frame-top, 0px) - 22px)";
+      css.top = "calc(var(--runtime-dialog-visible-top, 0px) - 22px)";
       css.left = "auto";
-      css.right = "calc(-1 * var(--runtime-dialog-frame-right, 0px) + 54px)";
+      css.right = "calc(var(--runtime-dialog-visible-right, 0px) + 54px)";
     } else if (s.anchor === "inside-left") {
-      css.top = "12px";
-      css.left = "24px";
+      css.top = "calc(var(--runtime-dialog-visible-top, 0px) + 12px)";
+      css.left = "calc(var(--runtime-dialog-visible-left, 0px) + 24px)";
       css.right = "auto";
     } else if (s.anchor === "inside-right") {
-      css.top = "12px";
+      css.top = "calc(var(--runtime-dialog-visible-top, 0px) + 12px)";
       css.left = "auto";
-      css.right = "24px";
+      css.right = "calc(var(--runtime-dialog-visible-right, 0px) + 24px)";
     }
   }
   if (s.top) css.top = s.top === "auto" ? "auto" : `calc(-1 * var(--runtime-dialog-frame-top, 0px) + ${s.top})`;
@@ -424,27 +437,27 @@ export function toolbarStyle(override: UiButtonStyle | undefined): CSSProperties
     css.flexDirection = "row";
     css.justifyContent = "flex-end";
     if (layout.anchor === "top-right") {
-      css.top = "calc(-1 * var(--runtime-dialog-frame-top, 0px) + 10px)";
+      css.top = "calc(var(--runtime-dialog-visible-top, 0px) + 10px)";
       css.left = "auto";
-      css.right = "calc(-1 * var(--runtime-dialog-frame-right, 0px) + 14px)";
+      css.right = "calc(var(--runtime-dialog-toolbar-right, var(--ui-skin-safe-right, 0px)) + 14px)";
     } else if (layout.anchor === "top-left") {
-      css.top = "calc(-1 * var(--runtime-dialog-frame-top, 0px) + 10px)";
-      css.left = "calc(-1 * var(--runtime-dialog-frame-left, 0px) + 14px)";
+      css.top = "calc(var(--runtime-dialog-visible-top, 0px) + 10px)";
+      css.left = "calc(var(--ui-skin-safe-left, var(--runtime-dialog-visible-left, 0px)) + 14px)";
       css.right = "auto";
       css.justifyContent = "flex-start";
     } else if (layout.anchor === "above-right") {
-      css.top = "calc(-1 * var(--runtime-dialog-frame-top, 0px) - 54px)";
+      css.top = "calc(var(--runtime-dialog-visible-top, 0px) - 54px)";
       css.left = "auto";
-      css.right = "calc(-1 * var(--runtime-dialog-frame-right, 0px) + 14px)";
+      css.right = "calc(var(--runtime-dialog-visible-right, 0px) + 14px)";
     } else if (layout.anchor === "bottom-right") {
       css.top = "auto";
-      css.bottom = "18px";
+      css.bottom = "calc(var(--ui-skin-safe-bottom, 0px) + 18px)";
       css.left = "auto";
-      css.right = "14px";
+      css.right = "calc(var(--ui-skin-safe-right, 0px) + 14px)";
     } else if (layout.anchor === "right-vertical") {
-      css.top = "calc(-1 * var(--runtime-dialog-frame-top, 0px) + 10px)";
+      css.top = "calc(var(--runtime-dialog-visible-top, 0px) + 10px)";
       css.left = "auto";
-      css.right = "calc(-1 * var(--runtime-dialog-frame-right, 0px) + 14px)";
+      css.right = "calc(var(--runtime-dialog-toolbar-right, var(--ui-skin-safe-right, 0px)) + 14px)";
       css.flexDirection = "column";
     }
   }

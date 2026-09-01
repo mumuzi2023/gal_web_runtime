@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useGameStore } from "../store";
+import { SKIN_SAFE_PRESETS, useSkinGeometryVariables } from "../skinGeometry";
 import {
   defaultLightPanel,
   panelOverlayStyle,
@@ -317,10 +318,13 @@ export default function ProgressPanel() {
   const edgeCfg = flowCfg?.edge;
   const nodeWidth = clamp(nodeCfg?.width || DEFAULT_NODE_W, 160, 360);
   const nodeHeight = clamp(nodeCfg?.height || DEFAULT_NODE_H, 68, 160);
-  const nodeDesktopSkin = uiImageUrl(nodeCfg?.skin?.desktop);
-  const nodeMobileSkin = uiImageUrl(nodeCfg?.skin?.mobile || nodeCfg?.skin?.desktop);
+  const nodeDesktopSkin = nodeCfg?.renderMode === "html" ? undefined : uiImageUrl(nodeCfg?.skin?.desktop);
+  const nodeMobileSkin = nodeCfg?.renderMode === "html" ? undefined : uiImageUrl(nodeCfg?.skin?.mobile || nodeCfg?.skin?.desktop);
+  const surfaceCfg = resolvePanelUi(ui, "flow");
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const surfaceRef = useRef<HTMLElement>(null);
+  const surfaceGeometry = useSkinGeometryVariables(surfaceRef, surfaceCfg?.skin, screen, SKIN_SAFE_PRESETS.panel);
   const pointersRef = useRef(new Map<number, { x: number; y: number }>());
   const gestureRef = useRef<{
     start: Transform;
@@ -437,7 +441,6 @@ export default function ProgressPanel() {
 
   if (screen !== "progress" || !gameData) return null;
 
-  const surfaceCfg = resolvePanelUi(ui, "flow");
   const surfaceCss = panelStyle(surfaceCfg, defaultLightPanel);
   const overlayCss = panelOverlayStyle(surfaceCfg, defaultLightPanel);
   const pageCss = responsiveSkinStyle(flowCfg?.pageBackground);
@@ -458,7 +461,7 @@ export default function ProgressPanel() {
   return (
     <div className="runtime-overlay flow-overlay ui-responsive-skin" style={pageCss} role="dialog" aria-modal="true" aria-labelledby="flow-title">
       <div className="runtime-overlay__scrim" style={overlayCss} />
-      <section className={`runtime-overlay__surface flow-surface ui-responsive-skin ${surfaceCfg?.skin || surfaceCfg?.backgroundImage ? "has-ui-skin" : ""}`} style={surfaceCss}>
+      <section ref={surfaceRef} className={`runtime-overlay__surface flow-surface ui-responsive-skin ${surfaceCfg?.skin || surfaceCfg?.backgroundImage ? "has-ui-skin" : ""}`} style={{ ...surfaceCss, ...surfaceGeometry }}>
         <header className="runtime-overlay__header flow-header">
           <div>
             <h2 id="flow-title" className="runtime-overlay__title">剧情路线</h2>
@@ -577,8 +580,8 @@ export default function ProgressPanel() {
                       style={{ fill: nodeCfg?.background, stroke: semanticNodeColor(node) || nodeCfg?.borderColor }}
                     />
                   )}
-                  {nodeDesktopSkin && <image className="flow-node__skin flow-node__skin--desktop" href={nodeDesktopSkin} width={nodeWidth} height={nodeHeight} preserveAspectRatio="none" />}
-                  {nodeMobileSkin && <image className="flow-node__skin flow-node__skin--mobile" href={nodeMobileSkin} width={nodeWidth} height={nodeHeight} preserveAspectRatio="none" />}
+                  {nodeDesktopSkin && <image className="flow-node__skin flow-node__skin--desktop" href={nodeDesktopSkin} width={nodeWidth} height={nodeHeight} preserveAspectRatio="xMidYMid meet" />}
+                  {nodeMobileSkin && <image className="flow-node__skin flow-node__skin--mobile" href={nodeMobileSkin} width={nodeWidth} height={nodeHeight} preserveAspectRatio="xMidYMid meet" />}
                   <circle cx={24} cy={23} r={7} style={{ fill: semanticNodeColor(node) }} />
                   <text className="flow-node__kind" x={39} y={27} style={{ fill: nodeCfg?.textColor }}>{node.subtitle}</text>
                   <text className="flow-node__title" x={20} y={Math.min(nodeHeight - 18, 58)} style={{ fill: nodeCfg?.textColor }}>{node.title.length > 15 ? `${node.title.slice(0, 15)}…` : node.title}</text>

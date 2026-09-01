@@ -65,13 +65,20 @@ export interface GameConfig {
 /* ── UI customization (all fields optional, fall back to defaults) ── */
 
 export type UiThemeMode = "light" | "dark";
-export type UiSkinFit = "cover" | "contain" | "stretch" | "tile" | "nine-slice";
+export type UiSkinFit = "cover" | "contain";
 
 export interface UiInsets {
   top?: number;
   right?: number;
   bottom?: number;
   left?: number;
+}
+
+export interface UiContentBounds {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
 }
 
 /** A generated or uploaded skin can use different artwork on wide and narrow screens. */
@@ -81,19 +88,47 @@ export interface UiResponsiveSkin {
   fit?: UiSkinFit;
   position?: string;
   opacity?: number;
-  /** Pixel borders used by CSS border-image when fit is nine-slice. */
-  nineSlice?: UiInsets & { fill?: boolean };
-  /** CSS pixel widths used to render the source nine-slice borders. */
-  borderWidth?: UiInsets;
-  /**
-   * Pixels by which a nine-slice border is expanded towards the outside.
-   * This compensates for decorative transparent margins in authored frames.
-   */
-  outset?: UiInsets;
   /** Content-safe inset authored together with the artwork. */
   safeArea?: UiInsets;
+  /** Decoded dimensions of the final rendered asset, e.g. 2048x512. */
+  sourceSize?: string;
+  mobileSourceSize?: string;
+  /** Normalized visible-alpha bounds within each untrimmed source canvas. */
+  contentBounds?: UiContentBounds;
+  mobileContentBounds?: UiContentBounds;
+  /**
+   * Normalized rectangle reserved for Runtime-owned text and controls.
+   * Unlike safeArea (legacy pixel padding), this remains correct when a
+   * contained source bitmap is rendered smaller than its DOM box.
+   */
+  safeBounds?: UiContentBounds;
+  mobileSafeBounds?: UiContentBounds;
   sourcePrompt?: string;
+  /** Seed used by the latest generated desktop/mobile skin. */
+  sourceSeed?: number;
+  mobileSourceSeed?: number;
   cutout?: "none" | "alpha" | "white-key" | "flat-frame" | "center-icon" | "ai";
+}
+
+export type UiRenderMode = "html" | "image";
+export type UiReferenceRegion =
+  | "top-left"
+  | "top-edge"
+  | "top-right"
+  | "left-edge"
+  | "right-edge"
+  | "bottom-left"
+  | "bottom-edge"
+  | "bottom-right";
+
+export interface UiImageDesign {
+  prompt?: string;
+  promptMode?: "auto" | "custom";
+  referenceImage?: string;
+  referenceSource?: "auto" | "upload";
+  referenceKind?: "generated" | "uploaded";
+  referenceSignature?: string;
+  regions?: UiReferenceRegion[];
 }
 
 export interface UiFontSystem {
@@ -152,6 +187,8 @@ export interface UiGlobalConfig {
   /** Project default; the player can still select another mode in Settings. */
   defaultTheme?: UiThemeMode;
   allowPlayerThemeChoice?: boolean;
+  imageStylePrompt?: string;
+  imageMotifs?: string;
   fonts?: UiFontSystem;
   colors?: UiSemanticColors;
   radii?: UiRadiusSystem;
@@ -171,6 +208,8 @@ export interface UiToolbarLayout {
 }
 
 export interface UiButtonStyle {
+  renderMode?: UiRenderMode;
+  imageDesign?: UiImageDesign;
   background?: string;            // CSS color (rgba/hex)
   backgroundImage?: string;       // url(...) or full url to image
   borderColor?: string;
@@ -200,6 +239,8 @@ export interface UiButtonStyle {
 }
 
 export interface UiPanelStyle {
+  renderMode?: UiRenderMode;
+  imageDesign?: UiImageDesign;
   background?: string;            // background color of the panel surface
   backgroundImage?: string;       // url string
   borderColor?: string;
@@ -216,6 +257,8 @@ export interface UiPanelStyle {
 }
 
 export interface UiTextboxStyle {
+  renderMode?: UiRenderMode;
+  imageDesign?: UiImageDesign;
   /** Legacy field, no effect now. */
   style?: string;
   /** Legacy alpha (0-1) for the dialog background. */
@@ -240,6 +283,8 @@ export interface UiTextboxStyle {
 }
 
 export interface UiNameplateStyle {
+  renderMode?: UiRenderMode;
+  imageDesign?: UiImageDesign;
   style?: string;                 // legacy
   position?: string;              // legacy ("top-left" etc.)
   /** Semantic attachment point used by the UI designer; custom keeps explicit offsets. */
@@ -300,7 +345,17 @@ export interface UiSaveLoadPageConfig extends UiPanelPageConfig {
 }
 
 export interface UiBacklogPageConfig extends UiPanelPageConfig {
+  /** Legacy per-line card skin. Runtime now renders a continuous transcript. */
   entry?: UiPanelStyle;
+  layout?: UiBacklogLayout;
+}
+
+export interface UiBacklogLayout {
+  contentInset?: string;
+  rowGap?: string;
+  avatarSize?: string;
+  showAvatars?: boolean;
+  speakerLayout?: "stacked" | "inline";
 }
 
 export interface UiEndingsPageConfig extends UiPanelPageConfig {
@@ -313,6 +368,8 @@ export type UiFlowNodeShape = "rounded-rect" | "rect" | "pill" | "diamond";
 export type UiFlowEdgeCurve = "smooth" | "straight" | "step";
 
 export interface UiFlowNodeStyle {
+  renderMode?: UiRenderMode;
+  imageDesign?: UiImageDesign;
   shape?: UiFlowNodeShape;
   width?: number;
   height?: number;

@@ -12,6 +12,7 @@ import BacklogPanel from "./components/BacklogPanel";
 import EndingsScreen from "./components/EndingsScreen";
 import ProgressPanel from "./components/ProgressPanel";
 import { globalThemeStyle, panelStyle } from "./uiConfig";
+import { SKIN_SAFE_PRESETS, useSkinGeometryVariables } from "./skinGeometry";
 import type { Screen, UiConfig } from "./types";
 
 export default function App() {
@@ -27,6 +28,7 @@ export default function App() {
   const preloadFailures = useGameStore((s) => s.preloadFailures);
   const commandIndex = useGameStore((s) => s.commandIndex);
   const commandSerial = useGameStore((s) => s.commandSerial);
+  const currentText = useGameStore((s) => s.currentText);
   const isTyping = useGameStore((s) => s.isTyping);
   const currentSceneKey = useGameStore((s) => s.currentSceneKey);
   const waitingForChoice = useGameStore((s) => s.waitingForChoice);
@@ -43,14 +45,21 @@ export default function App() {
   const toggleAutoMode = useGameStore((s) => s.toggleAutoMode);
   const appearance = useGameStore((s) => s.settings.appearance);
   const studioStarted = useRef(false);
+  const studioSceneReady = useRef(false);
   const [studioInteractive, setStudioInteractive] = useState(false);
-  const [studioSystemPreview, setStudioSystemPreview] = useState<string>();
+  const [studioSystemPreview, setStudioSystemPreview] = useState<"loading" | "error">();
+  const studioSurfaceRef = useRef<string | undefined>(undefined);
   const runtimeUi = gameData?.ui || gameData?.config?.ui;
   const projectTheme = runtimeUi?.global?.defaultTheme || "light";
   const resolvedAppearance = appearance === "project" ? projectTheme : appearance;
   const globalCss = globalThemeStyle(runtimeUi?.global);
   const loadingCss = panelStyle(runtimeUi?.pages?.system?.loading, {});
   const errorCss = panelStyle(runtimeUi?.pages?.system?.error, {});
+  const loadingPanelRef = useRef<HTMLDivElement>(null);
+  const errorPanelRef = useRef<HTMLDivElement>(null);
+  const systemGeometryKey = `${loading}:${Boolean(error)}:${studioSystemPreview || "none"}`;
+  const loadingGeometry = useSkinGeometryVariables(loadingPanelRef, runtimeUi?.pages?.system?.loading?.skin, systemGeometryKey, SKIN_SAFE_PRESETS.systemCard);
+  const errorGeometry = useSkinGeometryVariables(errorPanelRef, runtimeUi?.pages?.system?.error?.skin, systemGeometryKey, SKIN_SAFE_PRESETS.systemCard);
 
   useEffect(() => {
     // Get game data URL from query parameter, or auto-load game_data.json
@@ -72,16 +81,36 @@ export default function App() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("studio") !== "1" || screen !== "game") return;
+    // UI Studio can deliberately render a synthetic chapter card.  The
+    // command seeker must not dismiss that preview just because command 0 is
+    // not a chapter_title command.
+    if (studioSurfaceRef.current === "chapterCard") return;
     const target = Math.max(0, Number(params.get("command") || 0));
     if (commandIndex >= target) {
       const targetCommand = gameData?.scenes[currentSceneKey]?.commands[target];
       if (targetCommand?.type !== "chapter_title" && showChapterTitle) {
         useGameStore.setState({ showChapterTitle: false });
+        return;
       }
       if (targetCommand?.type !== "cg" && cgSrc) {
         useGameStore.setState({ cgSrc: null });
+        return;
       }
-      if (isTyping) finishTyping();
+      if (isTyping) {
+        finishTyping();
+        return;
+      }
+      if (!studioSceneReady.current) {
+        studioSceneReady.current = true;
+        window.parent.postMessage(
+          {
+            type: "storyforge:runtime-scene-ready",
+            sceneKey: currentSceneKey,
+            commandIndex,
+          },
+          window.location.origin,
+        );
+      }
       return;
     }
     const timer = window.setTimeout(() => {
@@ -140,6 +169,7 @@ export default function App() {
       const ui = event.data.ui as UiConfig | undefined;
       const target = event.data.screen as Screen | undefined;
       const surface = event.data.surface as string | undefined;
+      studioSurfaceRef.current = surface;
       const interactive = event.data.interactive === true;
       setStudioInteractive(interactive);
       if (!interactive) useGameStore.setState({ autoMode: false });
@@ -153,22 +183,55 @@ export default function App() {
         } : state);
       }
       if (target) useGameStore.getState().setScreen(target);
-      if (target === "game" && !surface) {
+      if (target === "backlog") {
+        useGameStore.setState({
+          backlog: [
+            {
+              character: "gu_yao",
+              characterName: "顾遥",
+              characterColor: "#2f75a8",
+              text: "雨停之后，站台尽头传来一声并不存在的汽笛。",
+            },
+            {
+              text: "潮水漫过旧铁轨，把没有寄出的那张车票推回岸边。她停了一会儿，又说起十年前最后一班列车离站时的灯光，以及那个至今没有等到回信的人。",
+            },
+            {
+              character: "gu_yao",
+              characterName: "顾遥",
+              characterColor: "#2f75a8",
+              text: "如果钟声再次响起，我们就沿着海岸继续走。",
+            },
+          ],
+        });
+      }
+      if (target === "game" && surface !== "chapterCard") {
+        const choicePreview = surface === "choiceButtons";
         useGameStore.setState({
           screen: "game",
           overlayReturnScreen: "game",
-          currentText: "雨停之后，站台尽头传来一声并不存在的汽笛。",
-          currentCharacter: "顾遥",
+          currentText: choicePreview ? "海风将岔路口的路牌吹得轻轻作响。" : "雨停之后，站台尽头传来一声并不存在的汽笛。",
+          currentCharacter: choicePreview ? null : "顾遥",
           currentCharacterColor: "var(--runtime-accent)",
-          waitingForClick: true,
-          waitingForChoice: false,
+          waitingForClick: !choicePreview,
+          waitingForChoice: choicePreview,
+          choiceOptions: choicePreview ? [
+            { text: "沿着海岸寻找旧车站" },
+            { text: "回到灯塔询问守夜人" },
+            { text: "留在原地等待潮声" },
+          ] : [],
           isTyping: false,
           showChapterTitle: false,
         });
       }
-      setStudioSystemPreview(surface === "loading" || surface === "error" ? surface : undefined);
+      setStudioSystemPreview(
+        surface === "loading" ? "loading" : surface === "error" ? "error" : undefined,
+      );
       if (surface === "chapterCard") {
         useGameStore.setState({
+          screen: "game",
+          overlayReturnScreen: "game",
+          waitingForChoice: false,
+          choiceOptions: [],
           showChapterTitle: true,
           chapterTitle: "第三章 · 潮声抵达之前",
           chapterSubtitle: "在分岔的夜晚，所有选择都有了回声",
@@ -200,7 +263,7 @@ export default function App() {
     return (
       <div className="runtime-loading" data-runtime-theme={resolvedAppearance} style={globalCss}>
         <div className="runtime-loading__glow" />
-        <div className="runtime-loading__panel ui-responsive-skin" style={loadingCss}>
+        <div ref={loadingPanelRef} className={`runtime-loading__panel ui-responsive-skin ${runtimeUi?.pages?.system?.loading?.skin ? "has-ui-skin" : ""}`} style={{ ...loadingCss, ...loadingGeometry }}>
           <div className="runtime-loading__eyebrow">STORYFORGE RUNTIME</div>
           <div className="runtime-loading__title">正在准备故事</div>
           <div className="runtime-loading__track">
@@ -215,7 +278,7 @@ export default function App() {
   if (error) {
     return (
       <div className="runtime-loading" data-runtime-theme={resolvedAppearance} style={globalCss}>
-        <div className="runtime-error-card ui-responsive-skin" style={errorCss}>
+        <div ref={errorPanelRef} className={`runtime-error-card ui-responsive-skin ${runtimeUi?.pages?.system?.error?.skin ? "has-ui-skin" : ""}`} style={{ ...errorCss, ...errorGeometry }}>
           <div className="runtime-error-card__icon">!</div>
           <div className="runtime-error-card__title">故事载入失败</div>
           <div className="runtime-error-card__detail">{error}</div>
@@ -239,7 +302,7 @@ export default function App() {
       {(screen === "game" || (screen !== "title" && overlayReturnScreen === "game")) && (
         <>
           <BackgroundLayer />
-          <DialogBox key={`${currentSceneKey}:${commandIndex}:${commandSerial}`} />
+          <DialogBox key={`${currentSceneKey}:${commandIndex}:${commandSerial}:${currentText}`} />
           <ChoiceMenu />
           <ChapterTitle />
         </>
@@ -260,7 +323,7 @@ export default function App() {
       {studioSystemPreview === "loading" && (
         <div className="runtime-loading runtime-studio-system" data-runtime-theme={resolvedAppearance} style={globalCss}>
           <div className="runtime-loading__glow" />
-          <div className="runtime-loading__panel ui-responsive-skin" style={loadingCss}>
+          <div ref={loadingPanelRef} className={`runtime-loading__panel ui-responsive-skin ${runtimeUi?.pages?.system?.loading?.skin ? "has-ui-skin" : ""}`} style={{ ...loadingCss, ...loadingGeometry }}>
             <div className="runtime-loading__eyebrow">STORYFORGE RUNTIME</div>
             <div className="runtime-loading__title">正在准备故事</div>
             <div className="runtime-loading__track"><span style={{ width: "64%" }} /></div>
@@ -270,11 +333,11 @@ export default function App() {
       )}
       {studioSystemPreview === "error" && (
         <div className="runtime-loading runtime-studio-system" data-runtime-theme={resolvedAppearance} style={globalCss}>
-          <div className="runtime-error-card ui-responsive-skin" style={errorCss}>
+          <div ref={errorPanelRef} className={`runtime-error-card ui-responsive-skin ${runtimeUi?.pages?.system?.error?.skin ? "has-ui-skin" : ""}`} style={{ ...errorCss, ...errorGeometry }}>
             <div className="runtime-error-card__icon">!</div>
             <div className="runtime-error-card__title">故事载入失败</div>
             <div className="runtime-error-card__detail">这里预览玩家实际看到的错误状态与重试入口。</div>
-            <button>重新加载</button>
+            <button onClick={() => window.location.reload()}>重新加载</button>
           </div>
         </div>
       )}
