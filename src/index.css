@@ -1011,6 +1011,11 @@ button:focus-visible, input:focus-visible {
 .title-screen__description { max-width: 720px; margin: 18px 0 0; color: var(--runtime-text-secondary); font-size: var(--runtime-text-ui); line-height: 1.75; }
 .title-screen__menu { display: grid; gap: 10px; width: clamp(280px, 24vw, 390px); max-width: 100%; margin-top: auto; }
 .title-menu-button { min-height: var(--runtime-control-size); font-size: var(--runtime-text-ui); cursor: pointer; backdrop-filter: blur(12px); transition: transform 180ms ease, border-color 180ms ease, background 180ms ease; }
+.title-menu-button.has-ui-skin {
+  aspect-ratio: var(--ui-skin-aspect, auto);
+  min-height: 0;
+  box-sizing: border-box;
+}
 .title-menu-button:hover { transform: translateX(5px); }
 .title-screen__footer { position: absolute; right: max(18px, var(--runtime-safe-right)); bottom: max(14px, var(--runtime-safe-bottom)); color: rgba(255,255,255,.34); font-size: var(--runtime-text-caption); }
 .title-screen--right .title-screen__content { align-items: flex-end; text-align: right; }

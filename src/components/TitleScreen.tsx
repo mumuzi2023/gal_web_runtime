@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useGameStore } from "../store";
+import { useSkinGeometryVariables } from "../skinGeometry";
 import {
   buttonStyle,
   buttonHoverStyle,
@@ -110,16 +111,20 @@ function MenuButton({
   const merged: UiButtonStyle = { ...defaultTitleButton, ...(base || {}), ...(override || {}) };
   const normal = buttonStyle(undefined, merged);
   const hover = buttonHoverStyle(undefined, merged);
+  const hasSkin = merged.renderMode !== "html" && Boolean(merged.skin || merged.backgroundImage);
   const [hovered, setHovered] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const skinGeometry = useSkinGeometryVariables(buttonRef, hasSkin ? merged.skin : undefined, actionKey);
   const labelText = merged.icon ? `${merged.icon}  ${label}` : label;
   return (
     <button
+      ref={buttonRef}
       data-title-menu-key={actionKey}
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      style={{ ...normal, ...(hovered ? hover : {}) }}
-      className="title-menu-button ui-responsive-skin text-lg tracking-wider"
+      style={{ ...normal, ...skinGeometry, ...(hovered ? hover : {}) }}
+      className={`title-menu-button ui-responsive-skin text-lg tracking-wider ${hasSkin ? "has-ui-skin" : ""}`}
     >
       {labelText}
     </button>
