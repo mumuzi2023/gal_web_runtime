@@ -148,6 +148,7 @@ export function collectSceneImageUrls(gameData: GameData, sceneKey: string): str
   visitCommands(scene.commands, (command) => {
     if (command.type === "bg" || command.type === "cg") {
       urls.push(resolveAsset(command.src, gameData));
+      if (command.type === "cg" && command.src_mobile) urls.push(resolveAsset(command.src_mobile, gameData));
     } else if (command.type === "show") {
       const character = gameData.characters[command.character];
       if (!character) return;

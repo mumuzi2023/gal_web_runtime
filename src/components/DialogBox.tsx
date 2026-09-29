@@ -13,6 +13,8 @@ import {
 import type { UiButtonStyle } from "../types";
 
 export default function DialogBox() {
+  const screen = useGameStore((s) => s.screen);
+  const commandSerial = useGameStore((s) => s.commandSerial);
   const currentText = useGameStore((s) => s.currentText);
   const currentCharacter = useGameStore((s) => s.currentCharacter);
   const currentCharacterColor = useGameStore((s) => s.currentCharacterColor);
@@ -35,51 +37,28 @@ export default function DialogBox() {
   const toolbarCss = toolbarStyle(gameUi.menuButtons);
   const menuOverrides = gameUi.menuButtonOverrides || {};
   const panelRef = useRef<HTMLElement>(null);
-  const visibleSkinVariables = useSkinGeometryVariables(panelRef, gameUi.textbox?.skin, `${currentText}:${waitingForClick}`, SKIN_SAFE_PRESETS.dialog);
-
-  const [displayedText, setDisplayedText] = useState(isTyping ? "" : currentText);
-  const timerRef = useRef<ReturnType<typeof setInterval>>(undefined);
+  const cgPreview = useGameStore((s) => s.cg?.phase === "preview");
+  const visible = !cgPreview && !waitingForChoice && Boolean(currentText || waitingForClick);
+  const visibleSkinVariables = useSkinGeometryVariables(panelRef, gameUi.textbox?.skin, visible, SKIN_SAFE_PRESETS.dialog);
   const autoTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const charIndexRef = useRef(0);
-
-  // Typewriter effect
-  useEffect(() => {
-    if (!isTyping || !currentText) return;
-
-    const interval = Math.max(10, 1000 / textSpeed);
-    timerRef.current = setInterval(() => {
-      charIndexRef.current++;
-      if (charIndexRef.current >= currentText.length) {
-        clearInterval(timerRef.current);
-        setDisplayedText(currentText);
-        finishTyping();
-      } else {
-        setDisplayedText(currentText.slice(0, charIndexRef.current));
-      }
-    }, interval);
-
-    return () => clearInterval(timerRef.current);
-  }, [currentText, isTyping, textSpeed, finishTyping]);
 
   // Auto mode
   useEffect(() => {
-    if (autoMode && waitingForClick && !isTyping) {
+    if (screen === "game" && autoMode && waitingForClick && !isTyping) {
       autoTimerRef.current = setTimeout(() => advanceCommand(), autoSpeed * 1000);
       return () => clearTimeout(autoTimerRef.current);
     }
-  }, [autoMode, waitingForClick, isTyping, autoSpeed, advanceCommand]);
+  }, [screen, commandSerial, autoMode, waitingForClick, isTyping, autoSpeed, advanceCommand]);
 
   const handleClick = useCallback(() => {
     if (isTyping) {
-      clearInterval(timerRef.current);
-      setDisplayedText(currentText);
       finishTyping();
     } else if (waitingForClick) {
       advanceCommand();
     }
-  }, [isTyping, waitingForClick, currentText, finishTyping, advanceCommand]);
+  }, [isTyping, waitingForClick, finishTyping, advanceCommand]);
 
-  if (waitingForChoice || (!currentText && !waitingForClick)) return null;
+  if (!visible) return null;
 
   const menuActions: { key: string; label: string; onClick: () => void; pressed?: boolean; activeOverride?: UiButtonStyle }[] = [
     {
@@ -131,8 +110,8 @@ export default function DialogBox() {
           className="dialog-copy"
           style={{ color: gameUi.textbox?.textColor || "var(--runtime-text-primary)" }}
         >
-          {isTyping ? displayedText : currentText}
-          {isTyping && <span className="typewriter-cursor dialog-cursor ml-0.5">|</span>}
+          <DialogText key={`${commandSerial}:${currentText}`} text={currentText}
+            active={screen === "game"} typing={isTyping} speed={textSpeed} onComplete={finishTyping} />
         </div>
 
         {/* CTC indicator — bottom-right, bouncing triangle */}
@@ -142,6 +121,33 @@ export default function DialogBox() {
       </section>
     </div>
   );
+}
+
+/** Reset only the per-command text, retaining the panel's measured skin geometry. */
+function DialogText({ text, active, typing, speed, onComplete }: {
+  text: string; active: boolean; typing: boolean; speed: number; onComplete: () => void;
+}) {
+  const [displayedText, setDisplayedText] = useState(typing ? "" : text);
+  const charIndex = useRef(0);
+
+  useEffect(() => {
+    if (!active || !typing || !text) return;
+    const timer = setInterval(() => {
+      charIndex.current++;
+      if (charIndex.current >= text.length) {
+        clearInterval(timer);
+        setDisplayedText(text);
+        onComplete();
+      } else {
+        setDisplayedText(text.slice(0, charIndex.current));
+      }
+    }, Math.max(10, 1000 / speed));
+    return () => clearInterval(timer);
+  }, [active, typing, text, speed, onComplete]);
+
+  return <>{typing ? displayedText : text}
+    {typing && <span className="typewriter-cursor dialog-cursor ml-0.5">|</span>}
+  </>;
 }
 
 function prefixIcon(o: UiButtonStyle | undefined, label: string): string {

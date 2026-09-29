@@ -147,6 +147,7 @@ function buildFlowGraph(
   currentSceneKey: string,
   nodeWidth: number,
   nodeHeight: number,
+  compact: boolean,
 ): FlowGraph {
   const configuredOrder = gameData.scene_order || [];
   const orderedKeys = [
@@ -245,9 +246,9 @@ function buildFlowGraph(
   }
 
   const maxLayerSize = Math.max(1, ...orderedLayers.map(([, group]) => group.length));
-  const width = Math.max(760, PAD_X * 2 + maxLayerSize * nodeWidth + (maxLayerSize - 1) * X_GAP);
+  let width = Math.max(760, PAD_X * 2 + maxLayerSize * nodeWidth + (maxLayerSize - 1) * X_GAP);
   const maxDepth = Math.max(...orderedLayers.map(([layer]) => layer));
-  const height = Math.max(460, PAD_Y * 2 + (maxDepth + 1) * nodeHeight + maxDepth * Y_GAP);
+  let height = Math.max(460, PAD_Y * 2 + (maxDepth + 1) * nodeHeight + maxDepth * Y_GAP);
   const nodes: FlowNode[] = [];
 
   for (const [layer, group] of orderedLayers) {
@@ -268,6 +269,15 @@ function buildFlowGraph(
         current: sceneKey === currentSceneKey,
       });
     });
+  }
+
+  if (compact) {
+    width = nodeWidth + 72;
+    nodes.forEach((node, index) => {
+      node.x = 36;
+      node.y = 24 + index * (nodeHeight + 40);
+    });
+    height = 48 + nodes.length * nodeHeight + Math.max(0, nodes.length - 1) * 40;
   }
 
   const positionMap = new Map(nodes.map((node) => [node.id, node]));
@@ -296,6 +306,10 @@ function edgePath(
     const middleY = startY + (endY - startY) / 2;
     return `M${startX},${startY} V${middleY} H${endX} V${endY}`;
   }
+  if (from.x === to.x && Math.abs(to.y - from.y) > nodeHeight * 2) {
+    const lane = from.x - 18 - (index % 2) * 10;
+    return `M${from.x},${from.y + nodeHeight / 2} H${lane} V${to.y + nodeHeight / 2} H${to.x}`;
+  }
   if (reverse) {
     const lane = Math.max(from.x + nodeWidth, to.x + nodeWidth) + 36 + (index % 4) * 12;
     return `M${startX},${startY} C${lane},${startY + 30} ${lane},${endY - 30} ${endX},${endY}`;
@@ -305,6 +319,13 @@ function edgePath(
 }
 
 export default function ProgressPanel() {
+  const [compact, setCompact] = useState(() => window.matchMedia("(max-width: 640px)").matches);
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 640px)");
+    const changed = () => setCompact(query.matches);
+    query.addEventListener("change", changed);
+    return () => query.removeEventListener("change", changed);
+  }, []);
   const screen = useGameStore((state) => state.screen);
   const closeOverlay = useGameStore((state) => state.closeOverlay);
   const gameData = useGameStore((state) => state.gameData);
@@ -316,13 +337,14 @@ export default function ProgressPanel() {
   const flowCfg = ui?.pages?.flow;
   const nodeCfg = flowCfg?.node;
   const edgeCfg = flowCfg?.edge;
-  const nodeWidth = clamp(nodeCfg?.width || DEFAULT_NODE_W, 160, 360);
+  const nodeWidth = clamp(nodeCfg?.width || DEFAULT_NODE_W, 160, compact ? 224 : 360);
   const nodeHeight = clamp(nodeCfg?.height || DEFAULT_NODE_H, 68, 160);
   const nodeDesktopSkin = nodeCfg?.renderMode === "html" ? undefined : uiImageUrl(nodeCfg?.skin?.desktop);
   const nodeMobileSkin = nodeCfg?.renderMode === "html" ? undefined : uiImageUrl(nodeCfg?.skin?.mobile || nodeCfg?.skin?.desktop);
   const surfaceCfg = resolvePanelUi(ui, "flow");
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const userTransformedRef = useRef(false);
   const surfaceRef = useRef<HTMLElement>(null);
   const surfaceGeometry = useSkinGeometryVariables(surfaceRef, surfaceCfg?.skin, screen, SKIN_SAFE_PRESETS.panel);
   const pointersRef = useRef(new Map<number, { x: number; y: number }>());
@@ -348,13 +370,14 @@ export default function ProgressPanel() {
   }, [gameData, saves, visitedScenes]);
 
   const graph = useMemo(
-    () => gameData ? buildFlowGraph(gameData, unlocked, currentSceneKey, nodeWidth, nodeHeight) : { nodes: [], edges: [], width: 720, height: 420 },
-    [currentSceneKey, gameData, nodeHeight, nodeWidth, unlocked],
+    () => gameData ? buildFlowGraph(gameData, unlocked, currentSceneKey, nodeWidth, nodeHeight, compact) : { nodes: [], edges: [], width: 720, height: 420 },
+    [compact, currentSceneKey, gameData, nodeHeight, nodeWidth, unlocked],
   );
   const nodeMap = useMemo(() => new Map(graph.nodes.map((node) => [node.id, node])), [graph.nodes]);
   const selected = selectedId ? nodeMap.get(selectedId) : undefined;
 
   const fitGraph = useCallback(() => {
+    userTransformedRef.current = true;
     const container = containerRef.current;
     if (!container) return;
     const rect = container.getBoundingClientRect();
@@ -369,16 +392,31 @@ export default function ProgressPanel() {
   useEffect(() => {
     const container = containerRef.current;
     if (!container || screen !== "progress") return;
-    const observer = new ResizeObserver(() => fitGraph());
+    userTransformedRef.current = false;
+    let previous: DOMRect | undefined;
+    const observer = new ResizeObserver(() => {
+      const rect = container.getBoundingClientRect();
+      if (!previous || !userTransformedRef.current) {
+        const scale = compact ? Math.min(1, (rect.width - 16) / graph.width) :
+          clamp(Math.min((rect.width - 32) / graph.width, (rect.height - 32) / graph.height), MIN_SCALE, 1);
+        const current = graph.nodes.find((node) => node.current) || graph.nodes[0];
+        setTransform({scale, x: (rect.width - graph.width * scale) / 2,
+          y: compact ? 16 - (current?.y || 0) * scale : Math.max(16, (rect.height - graph.height * scale) / 2)});
+      } else {
+        // Keep the same graph point at the center after resizing, preserving
+        // the player's zoom instead of fitting the whole graph again.
+        const dx = (rect.width - previous.width) / 2;
+        const dy = (rect.height - previous.height) / 2;
+        setTransform((current) => ({...current, x: current.x + dx, y: current.y + dy}));
+      }
+      previous = rect;
+    });
     observer.observe(container);
-    const frame = requestAnimationFrame(fitGraph);
-    return () => {
-      cancelAnimationFrame(frame);
-      observer.disconnect();
-    };
-  }, [fitGraph, screen]);
+    return () => observer.disconnect();
+  }, [compact, graph, screen]);
 
   const zoomAt = useCallback((clientX: number, clientY: number, nextScale: number) => {
+    userTransformedRef.current = true;
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
     setTransform((current) => {
@@ -393,6 +431,7 @@ export default function ProgressPanel() {
 
   const beginGesture = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if ((event.target as Element).closest("button, [data-flow-node]")) return;
+    userTransformedRef.current = true;
     event.currentTarget.setPointerCapture(event.pointerId);
     pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
     const points = [...pointersRef.current.values()];
@@ -524,7 +563,7 @@ export default function ProgressPanel() {
                 const path = edgePath(from, to, edge.reverse, index, nodeWidth, nodeHeight, edgeCfg?.curve || "smooth");
                 const label = edge.label && (from.visited ? edge.label : "？？？");
                 const labelX = (from.x + to.x) / 2 + nodeWidth / 2;
-                const labelY = (from.y + to.y + nodeHeight) / 2 - 7;
+                const labelY = compact ? to.y - 24 : (from.y + to.y + nodeHeight) / 2 - 7;
                 const labelWidth = Math.min(180, Math.max(48, (label?.length || 0) * 12 + 18));
                 return (
                   <g key={`${edge.from}-${edge.to}-${index}`}>

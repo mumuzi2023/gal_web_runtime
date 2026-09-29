@@ -1,5 +1,8 @@
+import { studioCommandTarget } from "./studioPreview";
+import { PlaybackTimer } from "./playbackTimer";
 import { create } from "zustand";
 import type {
+  ActiveCg,
   GameData,
   Command,
   VisibleCharacter,
@@ -114,8 +117,7 @@ export interface GameState {
   flashing: boolean;
   flashColor: string;
   effectType: string | null;
-  cgSrc: string | null;
-  cgMode: "full" | "half";
+  cg: ActiveCg | null;
   seSrc: string | null;
   seToken: number;
   soundEffects: SoundEffectEvent[];
@@ -145,6 +147,7 @@ export interface GameState {
   finishTyping: () => void;
   toggleAutoMode: () => void;
   dismissCg: () => void;
+  failCg: (src: string) => void;
   playVoice: (src: string) => void;
   saveGame: (slotId: number) => void;
   loadGame: (slotId: number) => void;
@@ -212,7 +215,7 @@ export const useGameStore = create<GameState>((set, get) => {
    * automatic chain exactly on that command instead of overshooting it. */
   const advancePassiveCommand = () => {
     const params = new URLSearchParams(window.location.search);
-    const studioTarget = Math.max(0, Number(params.get("command") || 0));
+    const studioTarget = studioCommandTarget(get().gameData?.scenes[get().currentSceneKey], Number(params.get("command") || 0));
     if (
       params.get("studio") === "1"
       && !get().studioInteractive
@@ -221,7 +224,10 @@ export const useGameStore = create<GameState>((set, get) => {
     get().advanceCommand();
   };
 
+  const commandTimer = new PlaybackTimer();
+
   const executeCommand = (cmd: Command) => {
+    commandTimer.cancel();
     set((current) => ({ commandSerial: current.commandSerial + 1 }));
     const state = get();
     const data = state.gameData;
@@ -230,6 +236,7 @@ export const useGameStore = create<GameState>((set, get) => {
     switch (cmd.type) {
       case "bg": {
         set({
+          cg: null,
           background: resolveUrl(cmd.src, data._asset_manifest),
           backgroundPosition: cmd.position || "center",
         });
@@ -458,16 +465,16 @@ export const useGameStore = create<GameState>((set, get) => {
 
       case "wait": {
         const params = new URLSearchParams(window.location.search);
-        const studioTarget = Math.max(0, Number(params.get("command") || 0));
+        const studioTarget = studioCommandTarget(get().gameData?.scenes[get().currentSceneKey], Number(params.get("command") || 0));
         if (params.get("studio") === "1") {
           if (get().commandIndex < studioTarget) advancePassiveCommand();
           break;
         }
         const duration = cmd.duration || 1000;
         const serial = get().commandSerial;
-        setTimeout(() => {
+        commandTimer.schedule(duration, () => {
           if (get().commandSerial === serial) get().advanceCommand();
-        }, duration);
+        });
         break;
       }
 
@@ -498,16 +505,33 @@ export const useGameStore = create<GameState>((set, get) => {
         // with a broken-image inside, which players experience as "the screen
         // suddenly went black mid-click".
         if (!resolved) {
+          set({ cg: null });
           advancePassiveCommand();
           break;
         }
         set({
-          cgSrc: resolved,
-          cgMode: cmd.mode === "half" ? "half" : "full",
+          cg: {
+            src: resolved,
+            srcMobile: resolveUrl(cmd.src_mobile, data._asset_manifest) || undefined,
+            mode: cmd.mode === "half" ? "half" : "full",
+            playback: cmd.playback === "story" ? "story" : "image",
+            phase: "preview",
+          },
+          currentText: "",
+          currentCharacter: null,
+          currentCharacterKey: null,
+          currentCharacterColor: null,
+          currentVoice: null,
           isTyping: false,
           waitingForClick: false,
         });
-        // CG stays until click
+        // First show the unobstructed image; the player decides when to continue.
+        break;
+      }
+
+      case "cg_end": {
+        set({ cg: null });
+        advancePassiveCommand();
         break;
       }
 
@@ -520,9 +544,9 @@ export const useGameStore = create<GameState>((set, get) => {
         const params = new URLSearchParams(window.location.search);
         if (params.get("studio") !== "1") {
           const serial = get().commandSerial;
-          setTimeout(() => {
+          commandTimer.schedule(3000, () => {
             if (get().commandSerial === serial) get().dismissChapterTitle();
-          }, 3000);
+          });
         }
         break;
       }
@@ -554,6 +578,7 @@ export const useGameStore = create<GameState>((set, get) => {
         }
         set({
           screen: "title",
+          cg: null,
           overlayReturnScreen: "title",
           bgmSrc: "",
           currentVoice: null,
@@ -585,16 +610,24 @@ export const useGameStore = create<GameState>((set, get) => {
     screen: "title",
     overlayReturnScreen: "title",
     studioInteractive: false,
-    setScreen: (screen) => set((state) => {
-      if (screen === "title" || screen === "game") {
-        return { screen, overlayReturnScreen: screen };
-      }
-      const base = state.screen === "title" || state.screen === "game"
-        ? state.screen
-        : state.overlayReturnScreen;
-      return { screen, overlayReturnScreen: base };
-    }),
-    closeOverlay: () => set((state) => ({ screen: state.overlayReturnScreen })),
+    setScreen: (screen) => {
+      if (screen === "title") commandTimer.cancel();
+      else if (screen === "game") commandTimer.resume();
+      else commandTimer.pause();
+      set((state) => {
+        if (screen === "title" || screen === "game") {
+          return { screen, overlayReturnScreen: screen, ...(screen === "title" ? { cg: null } : {}) };
+        }
+        const base = state.screen === "title" || state.screen === "game"
+          ? state.screen
+          : state.overlayReturnScreen;
+        return { screen, overlayReturnScreen: base };
+      });
+    },
+    closeOverlay: () => {
+      set((state) => ({ screen: state.overlayReturnScreen }));
+      if (get().screen === "game") commandTimer.resume();
+    },
 
     preloadProgress: 0,
     preloadLabel: "读取游戏数据…",
@@ -629,8 +662,7 @@ export const useGameStore = create<GameState>((set, get) => {
     flashing: false,
     flashColor: "#fff",
     effectType: null,
-    cgSrc: null,
-    cgMode: "full",
+    cg: null,
     seSrc: null,
     seToken: 0,
     soundEffects: [],
@@ -746,6 +778,7 @@ export const useGameStore = create<GameState>((set, get) => {
     },
 
     startNewGame: () => {
+      commandTimer.cancel();
       const data = get().gameData;
       if (!data) return;
 
@@ -785,7 +818,8 @@ export const useGameStore = create<GameState>((set, get) => {
         choiceOptions: [],
         backlog: [],
         autoMode: false,
-        cgSrc: null,
+        showChapterTitle: false,
+        cg: null,
         effectType: null,
         soundEffects: [],
         visitedScenes: [firstScene],
@@ -801,7 +835,7 @@ export const useGameStore = create<GameState>((set, get) => {
     advanceCommand: () => {
       const state = get();
       // Do NOT advance while waiting for a choice selection
-      if (state.waitingForChoice) return;
+      if (state.screen !== "game" || state.waitingForChoice || state.cg?.phase === "preview") return;
       // Stop voice from previous command when advancing
       set({ currentVoice: null });
 
@@ -845,6 +879,7 @@ export const useGameStore = create<GameState>((set, get) => {
               }
               set({
                 screen: "title",
+                cg: null,
                 overlayReturnScreen: "title",
                 bgmSrc: "",
                 currentVoice: null,
@@ -857,6 +892,7 @@ export const useGameStore = create<GameState>((set, get) => {
         }
         set({
           screen: "title",
+          cg: null,
           overlayReturnScreen: "title",
           bgmSrc: "",
           currentVoice: null,
@@ -894,13 +930,13 @@ export const useGameStore = create<GameState>((set, get) => {
       const data = get().gameData;
       let resolvedKey = sceneKey;
       if (!data) {
-        set({ screen: "title", overlayReturnScreen: "title", bgmSrc: "" });
+        set({ screen: "title", cg: null, overlayReturnScreen: "title", bgmSrc: "" });
         return;
       }
       if (!data.scenes[sceneKey]) {
         if (data.explicit_flow) {
           console.error(`[runtime] explicit jump target "${sceneKey}" does not exist`);
-          set({ screen: "title", overlayReturnScreen: "title", bgmSrc: "" });
+          set({ screen: "title", cg: null, overlayReturnScreen: "title", bgmSrc: "" });
           return;
         }
         // Fuzzy match: scripts sometimes reference "scene_name" but the actual
@@ -930,12 +966,13 @@ export const useGameStore = create<GameState>((set, get) => {
             }
           }
           console.error(`[runtime] jump target "${sceneKey}" not found and no fallback`);
-          set({ screen: "title", overlayReturnScreen: "title", bgmSrc: "" });
+          set({ screen: "title", cg: null, overlayReturnScreen: "title", bgmSrc: "" });
           return;
         }
       }
       const sceneDef = data.scenes[resolvedKey];
       set({
+        cg: null,
         currentSceneKey: resolvedKey,
         commandIndex: 0,
         commandQueue: [],
@@ -962,9 +999,18 @@ export const useGameStore = create<GameState>((set, get) => {
     toggleAutoMode: () => set((s) => ({ autoMode: !s.autoMode })),
 
     dismissCg: () => {
-      if (!get().cgSrc) return;
-      set({ cgSrc: null });
+      const cg = get().cg;
+      if (get().screen !== "game" || cg?.phase !== "preview") return;
+      set({ cg: cg.playback === "story" ? { ...cg, phase: "dialogue" } : null });
       get().advanceCommand();
+    },
+
+    failCg: (src: string) => {
+      const cg = get().cg;
+      if (!cg || cg.src !== src) return;
+      set({ cg: null });
+      // If the image fails after dialogue begins, preserve the current line.
+      if (cg.phase === "preview") get().advanceCommand();
     },
 
     playVoice: (src: string) => {
@@ -981,6 +1027,7 @@ export const useGameStore = create<GameState>((set, get) => {
         commandIndex: state.commandIndex,
         commandQueue: [...state.commandQueue],
         activeInlineCommand: state.activeInlineCommand || undefined,
+        cg: state.cg ? { ...state.cg } : undefined,
         variables: { ...state.variables },
         characters: [...state.visibleCharacters],
         background: state.background,
@@ -1000,7 +1047,11 @@ export const useGameStore = create<GameState>((set, get) => {
       const saves = get().saves;
       const slot = saves[slotId];
       if (!slot) return;
+      commandTimer.cancel();
       set({
+        cg: slot.cg ? { ...slot.cg } : null,
+        showChapterTitle: false,
+        autoMode: false,
         screen: "game",
         overlayReturnScreen: "game",
         currentSceneKey: slot.sceneKey,

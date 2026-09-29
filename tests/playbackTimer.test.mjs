@@ -1,0 +1,34 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { PlaybackTimer } from '../src/playbackTimer.ts';
+
+test('overlays retain remaining wait and superseded callbacks never execute', (t) => {
+  t.mock.timers.enable({apis:['setTimeout']});
+  let now = 0;
+  t.mock.method(performance, 'now', () => now);
+  const timer = new PlaybackTimer();
+  let calls = 0;
+  timer.schedule(1000, () => calls++);
+  now = 400;
+  t.mock.timers.tick(400);
+  timer.pause();
+  now += 5000;
+  t.mock.timers.tick(5000);
+  assert.equal(calls, 0);
+  timer.resume();
+  timer.resume();
+  t.mock.timers.tick(599);
+  assert.equal(calls, 0);
+  t.mock.timers.tick(1);
+  assert.equal(calls, 1);
+  timer.schedule(100, () => calls += 100);
+  timer.schedule(200, () => calls++);
+  t.mock.timers.tick(200);
+  assert.equal(calls, 2);
+  timer.schedule(100, () => calls++);
+  timer.pause();
+  timer.cancel();
+  timer.resume();
+  t.mock.timers.tick(1000);
+  assert.equal(calls, 2);
+});

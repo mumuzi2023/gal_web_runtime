@@ -453,6 +453,8 @@ export interface OutfitDef {
 }
 
 export interface SceneDef {
+  /** Preview-only mapping after absent optional media commands are omitted. */
+  _studio_command_indices?: number[];
   background?: string;
   bgm?: string;
   commands: Command[];
@@ -482,6 +484,7 @@ export type Command =
   | FlashCommand
   | EffectCommand
   | CgCommand
+  | CgEndCommand
   | ChapterTitleCommand
   | EndCommand;
 
@@ -600,9 +603,25 @@ export interface EffectCommand extends BaseCommand {
 export interface CgCommand extends BaseCommand {
   type: "cg";
   src: string;
+  /** Optional portrait artwork; desktop/landscape keep src. */
+  src_mobile?: string;
   transition?: string;
-  /** "full" (default) covers entire viewport; "half" centers the image and keeps background/characters visible. */
+  /** "full" (default) covers entire viewport; "half" centers a card over the background; story playback hides sprites. */
   mode?: "full" | "half";
+  /** Omitted in legacy scripts: one image, then continue. Story keeps the CG under dialogue. */
+  playback?: "image" | "story";
+}
+
+export interface CgEndCommand extends BaseCommand {
+  type: "cg_end";
+}
+
+export interface ActiveCg {
+  src: string;
+  srcMobile?: string;
+  mode: "full" | "half";
+  playback: "image" | "story";
+  phase: "preview" | "dialogue";
 }
 
 export interface ChapterTitleCommand extends BaseCommand {
@@ -650,6 +669,7 @@ export interface SaveSlot {
    * while that branch was playing. */
   commandQueue?: Command[];
   activeInlineCommand?: Command;
+  cg?: ActiveCg;
   variables: Record<string, number>;
   characters: VisibleCharacter[];
   background: string;

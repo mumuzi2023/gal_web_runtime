@@ -75,8 +75,11 @@ export function useSkinGeometryVariables(
   useLayoutEffect(() => {
     const element = elementRef.current;
     if (!element || !skin) {
-      const resetFrame = requestAnimationFrame(() => setVariables({}));
-      return () => cancelAnimationFrame(resetFrame);
+      // Geometry is a layout measurement: clear/measure before the browser
+      // paints. Deferring a frame exposes the fallback nameplate position.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setVariables({});
+      return;
     }
     const media = window.matchMedia("(max-width: 700px)");
     const update = () => {
@@ -134,12 +137,11 @@ export function useSkinGeometryVariables(
       });
     };
 
-    const updateFrame = requestAnimationFrame(update);
+    update();
     const observer = new ResizeObserver(update);
     observer.observe(element);
     media.addEventListener("change", update);
     return () => {
-      cancelAnimationFrame(updateFrame);
       observer.disconnect();
       media.removeEventListener("change", update);
     };

@@ -1,3 +1,4 @@
+import CgArtwork from "./CgArtwork";
 import { useGameStore } from "../store";
 import { resolveAssetUrl } from "../assets";
 
@@ -21,8 +22,8 @@ export default function BackgroundLayer() {
   const flashing = useGameStore((s) => s.flashing);
   const flashColor = useGameStore((s) => s.flashColor);
   const effectType = useGameStore((s) => s.effectType);
-  const cgSrc = useGameStore((s) => s.cgSrc);
-  const cgMode = useGameStore((s) => s.cgMode);
+  const cg = useGameStore((s) => s.cg);
+  const failCg = useGameStore((s) => s.failCg);
   const dismissCg = useGameStore((s) => s.dismissCg);
 
   const resolveExpression = (charKey: string, expr: string, outfitId?: string): string => {
@@ -64,7 +65,7 @@ export default function BackgroundLayer() {
       {effectType && <EffectParticles type={effectType} />}
 
       {/* Character sprites — left/center/right positions */}
-      <div className="character-stage">
+      <div className="character-stage" hidden={cg?.playback === "story"}>
         {visibleCharacters.map((vc, index) => {
           const spriteUrl = resolveExpression(vc.key, vc.expression, vc.outfitId);
           const fallbackPercent = visibleCharacters.length <= 1
@@ -98,45 +99,22 @@ export default function BackgroundLayer() {
         })}
       </div>
 
-      {/* CG overlay */}
-      {cgSrc && cgMode === "full" && (
-        <button
-          type="button"
-          className="cg-overlay cg-overlay--full"
-          onClick={dismissCg}
-          aria-label="继续剧情"
-        >
-          <img
-            src={cgSrc}
-            alt=""
-            className="cg-overlay__image"
-            onError={() => {
-              // A missing CG must not trap the story on a command that can no
-              // longer receive clicks. Skip it and continue the script.
-              dismissCg();
-            }}
+      {/* Keep the same image element mounted when the first click reveals UI. */}
+      {cg && (
+        <div className={`cg-overlay cg-overlay--${cg.mode === "half" ? "card" : "full"} ${cg.phase === "dialogue" ? "cg-overlay--story" : ""}`}>
+          {cg.mode === "half" && <span className="cg-overlay__scrim" />}
+          <CgArtwork
+            src={cg.src}
+            srcMobile={cg.srcMobile}
+            className={cg.mode === "half" ? "cg-overlay__card-image" : "cg-overlay__image"}
+            onError={() => failCg(cg.src)}
           />
-          <span className="cg-overlay__hint">点击继续</span>
-        </button>
-      )}
-      {cgSrc && cgMode === "half" && (
-        <button
-          type="button"
-          className="cg-overlay cg-overlay--card"
-          onClick={dismissCg}
-          aria-label="继续剧情"
-        >
-          <span className="cg-overlay__scrim" />
-          <img
-            src={cgSrc}
-            alt=""
-            className="cg-overlay__card-image"
-            onError={() => {
-              dismissCg();
-            }}
-          />
-          <span className="cg-overlay__hint">点击继续</span>
-        </button>
+          {cg.phase === "preview" && (
+            <button type="button" className="cg-overlay__continue" onClick={dismissCg} aria-label="继续剧情">
+              <span className="cg-overlay__hint">{cg.playback === "story" ? "点击显示剧情" : "点击继续"}</span>
+            </button>
+          )}
+        </div>
       )}
 
       {/* Flash overlay */}

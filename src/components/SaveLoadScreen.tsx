@@ -1,3 +1,4 @@
+import CgArtwork from "./CgArtwork";
 import { useGameStore } from "../store";
 import {
   defaultLightPanel,
@@ -93,16 +94,16 @@ export default function SaveLoadScreen() {
             >
               {/* Thumbnail area */}
               <div className="save-slot__preview">
-                {slot?.background ? (
+                {slot && (slot.cg?.src || slot.background) ? (
                   <>
-                    <img
+                    {slot.cg ? <CgArtwork src={slot.cg.src} srcMobile={slot.cg.srcMobile} className="w-full h-full object-contain bg-black" /> : <img
                       src={slot.background}
                       alt=""
                       className="w-full h-full object-cover opacity-80"
                       onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                    />
+                    />}
                     <div className="absolute inset-0">
-                      {slot.characters.map((vc) => {
+                      {(slot.cg?.playback === "story" ? [] : slot.characters).map((vc) => {
                         const spriteUrl = resolveExpression(vc.key, vc.expression, vc.outfitId);
                         if (!spriteUrl) return null;
                         const posStyle: React.CSSProperties = {

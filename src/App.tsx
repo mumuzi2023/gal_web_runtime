@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { studioCommandTarget } from "./studioPreview";
 import { useGameStore } from "./store";
 import TitleScreen from "./components/TitleScreen";
 import BackgroundLayer from "./components/BackgroundLayer";
@@ -27,14 +28,12 @@ export default function App() {
   const preloadLabel = useGameStore((s) => s.preloadLabel);
   const preloadFailures = useGameStore((s) => s.preloadFailures);
   const commandIndex = useGameStore((s) => s.commandIndex);
-  const commandSerial = useGameStore((s) => s.commandSerial);
-  const currentText = useGameStore((s) => s.currentText);
   const isTyping = useGameStore((s) => s.isTyping);
   const currentSceneKey = useGameStore((s) => s.currentSceneKey);
   const waitingForChoice = useGameStore((s) => s.waitingForChoice);
   const choiceOptions = useGameStore((s) => s.choiceOptions);
   const showChapterTitle = useGameStore((s) => s.showChapterTitle);
-  const cgSrc = useGameStore((s) => s.cgSrc);
+  const cg = useGameStore((s) => s.cg);
   const startNewGame = useGameStore((s) => s.startNewGame);
   const advanceCommand = useGameStore((s) => s.advanceCommand);
   const selectChoice = useGameStore((s) => s.selectChoice);
@@ -85,15 +84,15 @@ export default function App() {
     // command seeker must not dismiss that preview just because command 0 is
     // not a chapter_title command.
     if (studioSurfaceRef.current === "chapterCard") return;
-    const target = Math.max(0, Number(params.get("command") || 0));
+    const target = studioCommandTarget(gameData?.scenes[currentSceneKey], Number(params.get("command") || 0));
     if (commandIndex >= target) {
       const targetCommand = gameData?.scenes[currentSceneKey]?.commands[target];
       if (targetCommand?.type !== "chapter_title" && showChapterTitle) {
         useGameStore.setState({ showChapterTitle: false });
         return;
       }
-      if (targetCommand?.type !== "cg" && cgSrc) {
-        useGameStore.setState({ cgSrc: null });
+      if (targetCommand?.type !== "cg" && cg?.phase === "preview") {
+        dismissCg();
         return;
       }
       if (isTyping) {
@@ -116,11 +115,11 @@ export default function App() {
     const timer = window.setTimeout(() => {
       if (waitingForChoice && choiceOptions[0]) selectChoice(choiceOptions[0]);
       else if (showChapterTitle) dismissChapterTitle();
-      else if (cgSrc) dismissCg();
+      else if (cg?.phase === "preview") dismissCg();
       else advanceCommand();
     }, 80);
     return () => window.clearTimeout(timer);
-  }, [screen, commandIndex, currentSceneKey, gameData, waitingForChoice, choiceOptions, showChapterTitle, cgSrc, isTyping, advanceCommand, selectChoice, dismissChapterTitle, dismissCg, finishTyping]);
+  }, [screen, commandIndex, currentSceneKey, gameData, waitingForChoice, choiceOptions, showChapterTitle, cg, isTyping, advanceCommand, selectChoice, dismissChapterTitle, dismissCg, finishTyping]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -135,7 +134,8 @@ export default function App() {
       if ([" ", "Enter", "ArrowRight"].includes(event.key)) {
         event.preventDefault();
         const state = useGameStore.getState();
-        if (state.isTyping) finishTyping();
+        if (state.cg?.phase === "preview") dismissCg();
+        else if (state.isTyping) finishTyping();
         else if (state.waitingForClick) advanceCommand();
       } else if (event.key.toLowerCase() === "a") {
         toggleAutoMode();
@@ -143,7 +143,7 @@ export default function App() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [advanceCommand, closeOverlay, finishTyping, isStudio, screen, studioInteractive, toggleAutoMode, waitingForChoice]);
+  }, [advanceCommand, closeOverlay, dismissCg, finishTyping, isStudio, screen, studioInteractive, toggleAutoMode, waitingForChoice]);
 
   useEffect(() => {
     if (!isStudio || studioInteractive) return;
@@ -303,7 +303,7 @@ export default function App() {
       {(screen === "game" || (screen !== "title" && overlayReturnScreen === "game")) && (
         <>
           <BackgroundLayer />
-          <DialogBox key={`${currentSceneKey}:${commandIndex}:${commandSerial}:${currentText}`} />
+          <DialogBox />
           <ChoiceMenu />
           <ChapterTitle />
         </>

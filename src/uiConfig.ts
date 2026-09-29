@@ -252,14 +252,34 @@ export function buttonStyle(
   return css;
 }
 
+function hexContrast(foreground: string | undefined, background: string | undefined): number | null {
+  const luminance = (color: string | undefined) => {
+    if (!color || !/^#[\da-f]{6}$/i.test(color)) return null;
+    const channels = [1, 3, 5].map((offset) => {
+      const value = parseInt(color.slice(offset, offset + 2), 16) / 255;
+      return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+    });
+    return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+  };
+  const first = luminance(foreground);
+  const second = luminance(background);
+  return first === null || second === null ? null
+    : (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+}
+
 export function buttonHoverStyle(
   override: UiButtonStyle | undefined,
   fallback: UiButtonStyle,
 ): CSSProperties {
   const s: UiButtonStyle = { ...fallback, ...(override || {}) };
   const css: CSSProperties = {};
-  if (s.renderMode === "image" && s.skin) {
-    if (s.hoverTextColor) css.color = s.hoverTextColor;
+  if (s.renderMode !== "html" && (s.skin || s.backgroundImage)) {
+    // Hover does not recolor the bitmap. Check against its declared normal
+    // surface, not the HTML hover fill hidden underneath that bitmap.
+    const contrast = hexContrast(s.hoverTextColor, s.background);
+    const normalContrast = hexContrast(s.textColor, s.background);
+    if (s.hoverTextColor) css.color = contrast !== null && contrast < 4.5
+      && normalContrast !== null && normalContrast > contrast ? s.textColor : s.hoverTextColor;
     return css;
   }
   // Do not use the `background` shorthand here: it resets a generated icon's
@@ -386,27 +406,28 @@ export function nameplateStyle(
   if (s.fontFamily) css.fontFamily = s.fontFamily;
   if (s.fontWeight !== undefined) css.fontWeight = s.fontWeight;
   if (s.padding) css.padding = s.padding;
-  if (s.anchor && s.anchor !== "custom") {
+  const anchor = s.anchor || "top-left";
+  if (anchor !== "custom") {
     css.bottom = "auto";
     css.transform = "none";
-    if (s.anchor === "top-left") {
-      css.top = "calc(var(--runtime-dialog-visible-top, 0px) - 22px)";
-      css.left = "calc(var(--runtime-dialog-visible-left, 0px) + 54px)";
+    if (anchor === "top-left") {
+      css.top = "calc(var(--runtime-dialog-visible-top, 0px) + var(--runtime-nameplate-top, -22px))";
+      css.left = "calc(var(--runtime-dialog-visible-left, 0px) + var(--runtime-nameplate-inset, 54px))";
       css.right = "auto";
-    } else if (s.anchor === "top-center") {
-      css.top = "calc(var(--runtime-dialog-visible-top, 0px) - 22px)";
+    } else if (anchor === "top-center") {
+      css.top = "calc(var(--runtime-dialog-visible-top, 0px) + var(--runtime-nameplate-top, -22px))";
       css.left = "50%";
       css.right = "auto";
       css.transform = "translateX(-50%)";
-    } else if (s.anchor === "top-right") {
-      css.top = "calc(var(--runtime-dialog-visible-top, 0px) - 22px)";
+    } else if (anchor === "top-right") {
+      css.top = "calc(var(--runtime-dialog-visible-top, 0px) + var(--runtime-nameplate-top, -22px))";
       css.left = "auto";
-      css.right = "calc(var(--runtime-dialog-visible-right, 0px) + 54px)";
-    } else if (s.anchor === "inside-left") {
+      css.right = "calc(var(--runtime-dialog-visible-right, 0px) + var(--runtime-nameplate-inset, 54px))";
+    } else if (anchor === "inside-left") {
       css.top = "calc(var(--runtime-dialog-visible-top, 0px) + 12px)";
       css.left = "calc(var(--runtime-dialog-visible-left, 0px) + 24px)";
       css.right = "auto";
-    } else if (s.anchor === "inside-right") {
+    } else if (anchor === "inside-right") {
       css.top = "calc(var(--runtime-dialog-visible-top, 0px) + 12px)";
       css.left = "auto";
       css.right = "calc(var(--runtime-dialog-visible-right, 0px) + 24px)";
